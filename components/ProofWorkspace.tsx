@@ -457,14 +457,16 @@ function Summary({
           ? `${errata.list.length} ${errata.list.length === 1 ? "erratum" : "errata"} found${nSizes > 1 ? ` across ${nSizes} sizes` : ""}.`
           : "Finding the root causes…"
         : verdict === "partial"
-          ? "Everything Stitchproof could count adds up."
+          ? counted > 0
+            ? "Everything Stitchproof could count adds up."
+            : "No rows could be read, so nothing was checked yet."
           : "Stitchproof couldn't find any rows.";
 
   return (
     <div className="card rise overflow-hidden">
       <div className="grid gap-6 p-5 sm:grid-cols-[1fr_220px] sm:p-6">
         <div className="min-w-0">
-          <VerdictPill verdict={verdict} />
+          <VerdictPill verdict={verdict} unchecked={counted === 0} />
           <h2 className="mt-3 text-[22px] leading-tight font-semibold tracking-[-0.025em] sm:text-[26px]">{headline}</h2>
           {program.title && <p className="mt-1 text-[14px] text-ink-2">{program.title}</p>}
           <dl className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px] text-ink-3 tnum">
@@ -530,13 +532,13 @@ function Summary({
   );
 }
 
-function VerdictPill({ verdict }: { verdict: Proof["verdict"] }) {
+function VerdictPill({ verdict, unchecked }: { verdict: Proof["verdict"]; unchecked?: boolean }) {
   if (verdict === "proven")
     return <span className="pill bg-ok-soft text-ok"><Check size={13} strokeWidth={2.6} /> Proven</span>;
   if (verdict === "issues")
     return <span className="pill bg-bad-soft text-bad"><Alert size={13} strokeWidth={2.2} /> Doesn&apos;t add up</span>;
   if (verdict === "partial")
-    return <span className="pill bg-warn-soft text-warn"><Question size={13} strokeWidth={2.2} /> Partly verified</span>;
+    return <span className="pill bg-warn-soft text-warn"><Question size={13} strokeWidth={2.2} /> {unchecked ? "Not verified" : "Partly verified"}</span>;
   return <span className="pill bg-paper-2 text-ink-2">Nothing to count</span>;
 }
 

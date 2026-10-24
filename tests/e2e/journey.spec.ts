@@ -64,6 +64,8 @@ test.describe("core journey", () => {
     await page.route("**/api/read", (r) => r.fulfill({ status: 503, json: { error: "The AI reader is unavailable right now." } }));
     await page.goto("/proof?sample=scarf&run=1");
     await expect(page.getByText(/Showing what the offline reader could read/)).toBeVisible();
+    await expect(page.getByText("Not verified")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /nothing was checked yet/ })).toBeVisible();
   });
 });
 
