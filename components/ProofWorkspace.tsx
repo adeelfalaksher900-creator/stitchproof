@@ -581,7 +581,7 @@ function DiffLine({ before, after }: { before: string; after: string }) {
     ea--;
   }
   return (
-    <div className="mono mt-3 overflow-x-auto rounded-xl border border-line bg-surface text-[12px] leading-6">
+    <div className="mono mt-3 overflow-x-auto rounded-xl border border-line bg-surface text-[12px] leading-6" tabIndex={0} role="group" aria-label="Line before and after the fix">
       <div className="flex gap-3 px-3 whitespace-pre text-ink-2">
         <span className="select-none text-bad">−</span>
         <span>
