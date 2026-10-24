@@ -1,0 +1,14 @@
+import { chromium } from "playwright";
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
+await p.goto("http://localhost:3000/proof?sample=beanie&run=1", { waitUntil: "load" });
+await p.waitForTimeout(2500);
+const cards = await p.$$("section[aria-label=Proof] > .card, section[aria-label=Proof] article");
+await cards[0].screenshot({ path: "/home/claude/media/summary.png" });
+const arts = await p.$$("article");
+await arts[2].screenshot({ path: "/home/claude/media/erratum3.png" });
+await p.goto("http://localhost:3000/", { waitUntil: "load" });
+await p.evaluate(() => document.getElementById("how").scrollIntoView());
+await p.waitForTimeout(6500);
+const fig = await p.$(".iso-stage svg"); await fig.screenshot({ path: "/home/claude/media/figure.png" });
+await b.close();

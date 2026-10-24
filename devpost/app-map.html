@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stitchproof — app map</title>
+<style>
+  :root { --paper:#f7f5f0; --surface:#fff; --ink:#1a1916; --ink2:#55524b; --ink3:#8a867d; --line:#e6e2d9; --accent:#3e3bc9; --ok:#2f7a4d; --bad:#c0392b; }
+  @media (prefers-color-scheme: dark) { :root { --paper:#12110f; --surface:#1c1b18; --ink:#f2efe8; --ink2:#bdb8ad; --ink3:#8b867b; --line:#2e2c27; --accent:#8c8af5; --ok:#6cc08e; --bad:#f07a6c; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 48px 20px 80px; }
+  h1 { font-size: 30px; letter-spacing: -0.02em; margin: 0 0 4px; }
+  h2 { font-size: 19px; letter-spacing: -0.01em; margin: 40px 0 10px; }
+  p, li { color: var(--ink2); }
+  code { font: 13px ui-monospace, "SF Mono", Menlo, monospace; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 5px; color: var(--ink); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; margin: 12px 0; }
+  .muted { color: var(--ink3); font-size: 13px; }
+  ol.route { counter-reset: s; list-style: none; padding: 0; }
+  ol.route li { counter-increment: s; position: relative; padding-left: 40px; margin: 14px 0; }
+  ol.route li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; font-weight: 600; color: var(--ink); font-size: 13px; }
+  svg text { font: 12px ui-sans-serif, system-ui, sans-serif; fill: var(--ink); }
+  svg .sub { fill: var(--ink3); font-size: 11px; }
+  svg rect { fill: var(--surface); stroke: var(--line); }
+  svg path { stroke: var(--ink3); fill: none; }
+  details summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Stitchproof — app map</h1>
+  <p class="muted">A snapshot of how the finished proof of concept fits together (source as of the commit that adds this file). It can drift as the code changes.</p>
+
+  <h2>What it is</h2>
+  <p>Paste a knitting pattern. The <strong>reader</strong> turns it into a stitch program, the <strong>counter</strong> runs every row for every size, and the <strong>fixer</strong> searches for the smallest edit that makes a broken row add up. AI is used only to translate lines the offline reader can't parse, and its output is parsed again before anything is counted.</p>
+
+  <h2>One action, end to end: “Proof pattern”</h2>
+  <div class="card" role="img" aria-label="Diagram: Proof button to reader, counter, fixer and the results on screen">
+    <svg viewBox="0 0 800 150" width="100%">
+      <rect x="4" y="40" width="140" height="64" rx="12"/><text x="18" y="66">Proof pattern</text><text class="sub" x="18" y="86">ProofWorkspace.run</text>
+      <rect x="180" y="40" width="140" height="64" rx="12"/><text x="194" y="66">Read</text><text class="sub" x="194" y="86">lib/read.ts</text>
+      <rect x="356" y="40" width="140" height="64" rx="12"/><text x="370" y="66">Count</text><text class="sub" x="370" y="86">simulate.ts</text>
+      <rect x="532" y="40" width="120" height="64" rx="12"/><text x="546" y="66">Fix</text><text class="sub" x="546" y="86">errata.ts</text>
+      <rect x="688" y="40" width="108" height="64" rx="12"/><text x="700" y="66">On screen</text><text class="sub" x="700" y="86">errata, rows</text>
+      <path d="M144 72H180M320 72H356M496 72H532M652 72H688"/>
+      <rect x="180" y="118" width="140" height="28" rx="8"/><text class="sub" x="192" y="137">/api/read (only if needed)</text>
+      <path d="M250 104V118"/>
+    </svg>
+  </div>
+
+  <h2>Route through the code <span class="muted">(reference route — not toured interactively)</span></h2>
+  <ol class="route">
+    <li><code>components/ProofWorkspace.tsx</code> → <code>run()</code>: validates length, calls <code>readPattern</code>, then <code>proofProgram</code>, saves the pattern with <code>save()</code>.</li>
+    <li><code>lib/read.ts</code> → <code>readPattern()</code>: tries <code>parsePattern()</code> (in <code>lib/stitch/parse.ts</code>); only if lines are <em>unread</em> does it POST to <code>app/api/read/route.ts</code>, whose <code>aiRead()</code> (<code>lib/ai/reader.ts</code>) parses the model's notation and retries once with the parser's errors.</li>
+    <li><code>lib/stitch/simulate.ts</code> → <code>simulateRow()</code>: walks the ops with the <code>STITCHES</code> uses/makes table (<code>lib/stitch/stitches.ts</code>) and produces each row's status and messages. <code>lib/stitch/errata.ts</code> → <code>findErrata()</code> then calls <code>findFixes()</code> (<code>lib/stitch/fixes.ts</code>) to rank edits.</li>
+  </ol>
+
+  <h2>To change this, start here</h2>
+  <ul>
+    <li><strong>Add a stitch</strong> (e.g. <code>m1lp</code>): add it to <code>STITCHES</code> or <code>ALIASES</code> in <code>lib/stitch/stitches.ts</code>; the counter, strip and plain English pick it up.</li>
+    <li><strong>Read a new phrasing offline</strong>: <code>readItem()</code> or <code>readRepeatSpec()</code> in <code>lib/stitch/parse.ts</code>, plus a test in <code>tests/unit/stitch.test.ts</code>.</li>
+    <li><strong>Change how fixes are ranked</strong>: the <code>delta</code> score and sort at the end of <code>findFixes()</code>.</li>
+    <li><strong>Change the AI model or prompt</strong>: <code>candidates()</code> in <code>app/api/read/route.ts</code> and <code>SYSTEM_PROMPT</code> in <code>lib/ai/prompt.ts</code>.</li>
+    <li><strong>Add a sample</strong>: <code>lib/samples.ts</code>.</li>
+  </ul>
+
+  <h2>A practice to reuse</h2>
+  <div class="card">
+    <p><strong>Decision:</strong> the AI's output is text in the same notation the offline reader already parses, not a hidden structure (<code>devpost/spec.md › What Was Simplified and Why</code>).</p>
+    <p><strong>Evidence:</strong> <code>tests/unit/reader.test.ts</code> shows a malformed model answer being caught by the parser and repaired on the second attempt, and a faithful translation of the prose scarf still exposing its 34-vs-33 error.</p>
+    <p><strong>Reuse it:</strong> whenever a model feeds a deterministic system, make it emit something your own validator can check, and send the validator's errors back for one repair attempt.</p>
+  </div>
+
+  <h2>Run it again</h2>
+  <p><code>npm install</code> → <code>npm run dev</code> → open <code>http://localhost:3000/proof?sample=beanie&amp;run=1</code>. Tests: <code>npm test</code>, then <code>npm run build &amp;&amp; npm run test:e2e</code>.</p>
+</main>
+</body>
+</html>

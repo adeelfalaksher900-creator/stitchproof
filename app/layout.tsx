@@ -19,7 +19,9 @@ export const metadata: Metadata = {
     title: "Stitchproof",
     description: "A compiler for knitting patterns: every row, proven before you cast on.",
     type: "website",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Stitchproof finding three errata in a three-size beanie pattern" }],
   },
+  twitter: { card: "summary_large_image", images: ["/og.png"] },
 };
 
 export const viewport: Viewport = {

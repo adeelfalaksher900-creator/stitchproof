@@ -10,7 +10,7 @@ Build mode: fast (learner asked for autonomous execution; hands-on review happen
 
 ## Slices
 
-- [ ] **1. A pasted standard pattern is proofed row by row**
+- [x] **1. A pasted standard pattern is proofed row by row**
   Becomes usable: The Proof screen: paste the clean dishcloth sample, press Proof, see "Proven" and every row's computed count.
   Why now: Proves the kernel's hardest half — the offline reader and the counter — end to end, with the scaffold folded in.
   PRD ref: `prd.md > The Core Journey` (steps 2–5), `prd.md > The proof`
@@ -20,7 +20,7 @@ Build mode: fast (learner asked for autonomous execution; hands-on review happen
   Learner check: Open /proof, choose "Garter-rib dishcloth", press Proof, and confirm every row is green.
   Commit: `Proof standard patterns row by row`
 
-- [ ] **2. Errata are found per size, with a suggested fix you can apply**
+- [x] **2. Errata are found per size, with a suggested fix you can apply**
   Becomes usable: The flawed beanie shows its planted issues on the right rows and sizes, each with a suggested fix; Apply fix edits the text and the proof turns green.
   Why now: This is the unique kernel's payoff and the demo's "oh" moment, so it comes before polish.
   PRD ref: `prd.md > Suggested fixes`, `prd.md > The proof`
@@ -36,11 +36,11 @@ Build mode: fast (learner asked for autonomous execution; hands-on review happen
   PRD ref: `prd.md > Reading the pattern (AI translation)`
   Spec ref: `spec.md > AI reader route — app/api/read/route.ts`, `spec.md > External Services and Dependencies`
   Build: System prompt with canonical notation; route with Zod validation, rate limit, timeout, parse check and one repair retry; client fallback banner; "How Stitchproof read this" disclosure.
-  Verify (mechanical): Unit test of route logic with a mocked model (valid output, repaired output, failure → 503). After deploy: POST the prose sample to the live route and confirm it parses.
+  Verify (mechanical): Unit test of route logic with a mocked model (valid output, repaired output, failure → 503) — passing. After deploy: POST the prose sample to the live route and confirm it parses — pending AI credentials on the deployment; the fallback path is verified live.
   Learner check: Choose "Prose scarf", press Proof, open "How Stitchproof read this".
   Commit: `Add AI reader with parser-checked translation`
 
-- [ ] **4. You can see the fabric and read each row in plain English**
+- [x] **4. You can see the fabric and read each row in plain English**
   Becomes usable: Shape preview for the selected size, stitch strip and plain-English expansion per row, abbreviation tooltips.
   Why now: Turns the proof into something a knitter understands at a glance; needed before Knit mode reuses it.
   PRD ref: `prd.md > Shape preview and stitch strip`, `prd.md > Plain-English rows`
@@ -50,7 +50,7 @@ Build mode: fast (learner asked for autonomous execution; hands-on review happen
   Learner check: Switch sizes and watch the shape change; expand a row.
   Commit: `Add shape preview, stitch strip and plain-English rows`
 
-- [ ] **5. Knit row by row, and come back to where you were**
+- [x] **5. Knit row by row, and come back to where you were**
   Becomes usable: Knit mode with keyboard controls, saved progress, and My patterns.
   Why now: Completes the core loop and the reason to return.
   PRD ref: `prd.md > Knit mode and saved progress`, `prd.md > My patterns`
@@ -60,7 +60,7 @@ Build mode: fast (learner asked for autonomous execution; hands-on review happen
   Learner check: Knit a few rows, reload, and confirm your place is kept.
   Commit: `Add Knit mode and saved progress`
 
-- [ ] **6. The home page explains it with a working figure, and it's live**
+- [x] **6. The home page explains it with a working figure, and it's live**
   Becomes usable: Home page with the counting-machine figure and CTAs; production deployment on Vercel with AI via OIDC.
   Why now: Presentation and access for judges once the product works.
   PRD ref: `prd.md > Screens and Layout`, `prd.md > Look and Feel`
@@ -72,7 +72,7 @@ Build mode: fast (learner asked for autonomous execution; hands-on review happen
 
 ## Hands-on Checkpoints
 
-- [ ] Early usable behavior explored — shared with final review (learner asked to review the finished project once)
+- [ ] Early usable behavior explored — shared with final review (learner asked to review the finished project once; pending)
 - [ ] Final kick-the-tires exploration and feedback completed
 
 ## Final Review
@@ -81,14 +81,20 @@ Build mode: fast (learner asked for autonomous execution; hands-on review happen
 
 ## Code Tour and App Map
 
-- [ ] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
-- [ ] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
-- [ ] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
+- [x] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
+- [x] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
+- [x] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
 
-Activity and evidence: [pending]
-Route and stops: [pending]
-Edit outcome: [pending]
-Reflection: [pending]
-Activity mode: [pending]
+Activity and evidence: Brief evidence-based recap (the learner delegated the build). Practice connected to `tests/unit/reader.test.ts` (parser-checked AI translation with one repair retry).
+Route and stops: Reference route only — `components/ProofWorkspace.tsx › run`, `lib/read.ts › readPattern`, `lib/stitch/simulate.ts › simulateRow`, `lib/stitch/errata.ts › findErrata`.
+Edit outcome: Not applicable (no learner edit during the wrap-up).
+Reflection: Not offered yet — left for the learner's review session.
+Activity mode: Recap.
 
 ## Revisions
+
+- The fixer also tries numbers in up to two earlier rows that change the stitch count — a cast-on that doesn't fit the rib shows up on Rnd 1 but is fixed in the cast-on line.
+- Identical consecutive rows (same line, counts and messages) are grouped in the row list, including issue rows — 12 identical red brim rounds read as one.
+- Production URL is `stitchproof-alpha.vercel.app` — `stitchproof.vercel.app` was already taken.
+- Vercel AI Gateway won't serve requests until the team has a card on file, so the AI reader also accepts a free Google Gemini key (`GOOGLE_GENERATIVE_AI_API_KEY`); the route tries Gemini first when set.
+- The sandbox couldn't push to GitHub, so code reaches the repository through GitHub's web uploader; the first upload consolidated the local history into one commit, and later changes are committed one change at a time.

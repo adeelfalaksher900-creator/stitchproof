@@ -9,6 +9,8 @@
 
 ---
 
+![Stitchproof proofing a three-size beanie: three errata found, each with a suggested fix](docs/proof.png)
+
 ## The problem
 
 Every written knitting pattern makes a promise: *follow these instructions and you'll have exactly this many stitches.* Breaking that promise is expensive — you find out forty rows later and rip everything out.
@@ -29,6 +31,8 @@ Stitchproof checks the arithmetic for you — without trusting a language model 
 | **Plain English** | Any row expands into words, with the repeat counts worked out ("repeat [purl 2, knit 2] until 5 stitches remain — that's 9 times"). |
 | **Knit mode** | One row at a time, with the count to expect. Your place is saved in the browser. |
 | **AI reader** | Messy prose ("knit every row until…") is translated by a small model into strict notation, which the parser then checks. Every number is copied, never corrected. |
+
+<p align="center"><img src="docs/knit.png" alt="Knit mode: one round at a time in plain English, with the count to expect" width="49%"> <img src="docs/figure.png" alt="Fig 1, the stitch counter: type slugs as wide as the stitches they use, one pin per stitch they make" width="49%"></p>
 
 Try it with the samples on the Proof page: **Harbour Beanie** (three planted errata across three sizes), **Garter-Rib Dishcloth** (adds up), and **Weekend Scarf** (loose prose, read by AI). All samples are original patterns written for this project.
 
