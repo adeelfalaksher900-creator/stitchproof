@@ -23,8 +23,9 @@ function groupRows(program: Program, result: SizeResult): Group[] {
     if (
       prev && prevRow && prevRes &&
       prevRow.line === row.line &&
-      r.status === "ok" && prevRes.status === "ok" &&
-      r.before === prevRes.after && r.after === r.before && prevRes.after === prevRes.before &&
+      r.status === prevRes.status && r.status !== "unverifiable" &&
+      r.before === prevRes.before && r.after === prevRes.after &&
+      r.messages.map((m) => m.text).join() === prevRes.messages.map((m) => m.text).join() &&
       row.number !== null && prevRow.number !== null
     ) {
       prev.end = i;

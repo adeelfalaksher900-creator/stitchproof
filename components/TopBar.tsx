@@ -6,9 +6,9 @@ import { Github, Logo } from "./icons";
 
 export const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/adeelfalaksher900-creator/stitchproof";
 
-const NAV = [
+const NAV: { href: string; label: string; short?: string }[] = [
   { href: "/proof", label: "Proof" },
-  { href: "/patterns", label: "My patterns" },
+  { href: "/patterns", label: "My patterns", short: "Patterns" },
 ];
 
 export function TopBar() {
@@ -16,7 +16,7 @@ export function TopBar() {
   if (path?.startsWith("/knit/")) return null;
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-paper/80 backdrop-blur-xl backdrop-saturate-150">
-      <div className="mx-auto flex h-14 max-w-[1280px] items-center gap-6 px-4 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-[1280px] items-center gap-3 px-4 sm:gap-6 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5 rounded-lg" aria-label="Stitchproof home">
           <Logo size={26} />
           <span className="text-[15px] font-semibold tracking-[-0.02em]">Stitchproof</span>
@@ -33,7 +33,14 @@ export function TopBar() {
                   active ? "bg-paper-2 text-ink" : "text-ink-2 hover:text-ink"
                 }`}
               >
-                {n.label}
+                {n.short ? (
+                  <>
+                    <span className="sm:hidden">{n.short}</span>
+                    <span className="hidden sm:inline">{n.label}</span>
+                  </>
+                ) : (
+                  n.label
+                )}
               </Link>
             );
           })}

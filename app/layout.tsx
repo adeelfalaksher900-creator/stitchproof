@@ -3,11 +3,12 @@ import "@fontsource-variable/inter";
 import "@fontsource/instrument-serif/400.css";
 import "@fontsource/instrument-serif/400-italic.css";
 import "@fontsource-variable/jetbrains-mono";
+import "./iso.css";
 import "./globals.css";
 import { TopBar } from "@/components/TopBar";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://stitchproof.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://stitchproof-alpha.vercel.app"),
   title: {
     default: "Stitchproof — every row, proven before you cast on",
     template: "%s · Stitchproof",

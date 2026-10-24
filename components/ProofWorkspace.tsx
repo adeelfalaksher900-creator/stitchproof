@@ -448,7 +448,11 @@ function Summary({
             <div>
               <dt className="inline">Read </dt>
               <dd className="inline font-medium text-ink-2">
-                {reading.readBy === "ai" ? `with AI · ${reading.model?.split("/").pop()} · checked by the parser` : "offline · no AI needed"}
+                {reading.readBy === "ai"
+                  ? `with AI · ${reading.model?.split("/").pop()} · checked by the parser`
+                  : reading.aiNote
+                    ? "offline · AI reader not used"
+                    : "offline · no AI needed"}
               </dd>
             </div>
             {elapsed !== null && <div><dt className="inline">in </dt><dd className="inline font-medium text-ink-2">{elapsed < 1000 ? `${Math.max(1, Math.round(elapsed))} ms` : `${(elapsed / 1000).toFixed(1)} s`}</dd></div>}

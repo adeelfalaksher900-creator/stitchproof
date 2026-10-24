@@ -1,4 +1,5 @@
-import { generateText } from "ai";
+import { google } from "@ai-sdk/google";
+import { generateText, type LanguageModel } from "ai";
 import { z } from "zod";
 import { aiRead } from "@/lib/ai/reader";
 
@@ -8,9 +9,29 @@ export const maxDuration = 60;
 const MAX_CHARS = 20_000;
 const Body = z.object({ text: z.string().trim().min(1, "Paste a pattern first.").max(MAX_CHARS, `Patterns are limited to ${MAX_CHARS.toLocaleString()} characters.`) });
 
-const MODELS = [process.env.STITCHPROOF_MODEL, "anthropic/claude-haiku-5.5", "anthropic/claude-haiku-4.5"].filter(
-  (m, i, a): m is string => Boolean(m) && a.indexOf(m) === i,
-);
+interface Candidate {
+  label: string;
+  model: LanguageModel;
+}
+
+/**
+ * Models to try, in order. A Gemini key (free tier) is used first when set;
+ * otherwise Vercel AI Gateway, which authenticates with the deployment's OIDC token.
+ */
+function candidates(): Candidate[] {
+  const list: Candidate[] = [];
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    const id = process.env.GEMINI_MODEL || "gemini-flash-latest";
+    list.push({ label: `google/${id}`, model: google(id) });
+  }
+  if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL) {
+    const ids = [process.env.STITCHPROOF_MODEL, "anthropic/claude-haiku-5.5", "anthropic/claude-haiku-4.5"];
+    for (const id of ids) {
+      if (id && !list.some((c) => c.label === id)) list.push({ label: id, model: id });
+    }
+  }
+  return list;
+}
 
 // Best-effort, per-instance rate limit: 10 readings per minute per address.
 const WINDOW_MS = 60_000;
@@ -43,12 +64,13 @@ export async function POST(req: Request) {
     return Response.json({ error: parsed.error.issues[0]?.message ?? "Invalid request." }, { status: 400 });
   }
 
-  if (!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN && !process.env.VERCEL) {
+  const models = candidates();
+  if (models.length === 0) {
     return Response.json({ error: "The AI reader isn't configured here." }, { status: 503 });
   }
 
   let lastError = "";
-  for (const model of MODELS) {
+  for (const { label, model } of models) {
     try {
       const result = await aiRead(parsed.data.text, async ({ system, prompt }) => {
         const { text } = await generateText({
@@ -61,10 +83,10 @@ export async function POST(req: Request) {
         });
         return text;
       });
-      return Response.json({ ...result, model });
+      return Response.json({ ...result, model: label });
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
-      console.error(`[read] ${model} failed:`, lastError.slice(0, 300));
+      console.error(`[read] ${label} failed:`, lastError.slice(0, 300));
     }
   }
   return Response.json({ error: "The AI reader is unavailable right now." }, { status: 503 });

@@ -20,9 +20,9 @@ export default function Home() {
     <div className="overflow-x-clip">
       {/* ---------- Hero ---------- */}
       <section className="mx-auto grid max-w-[1200px] items-center gap-12 px-4 pt-14 pb-16 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pt-24 lg:pb-24">
-        <div>
+        <div className="min-w-0">
           <p className="text-[13px] font-semibold tracking-wide text-accent uppercase">For knitters &amp; pattern designers</p>
-          <h1 className="serif mt-4 text-[52px] leading-[0.98] text-ink sm:text-[68px] lg:text-[76px]">
+          <h1 className="serif mt-4 text-[46px] leading-[0.98] text-ink sm:text-[68px] lg:text-[76px]">
             Every row, <em className="text-accent">proven</em> before you cast on.
           </h1>
           <p className="mt-6 max-w-[34rem] text-[17px] leading-relaxed text-ink-2 sm:text-[18px]">
@@ -41,8 +41,8 @@ export default function Home() {
 
         {/* A real erratum, rendered from the engine. */}
         {e && (
-          <div className="relative">
-            <div aria-hidden className="absolute -inset-6 -z-10 rounded-[32px] bg-paper-2" />
+          <div className="relative min-w-0">
+            <div aria-hidden className="absolute -inset-3 sm:-inset-6 -z-10 rounded-[32px] bg-paper-2" />
             <div className="card overflow-hidden shadow-[var(--shadow-2)]">
               <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">
                 <span className="pill bg-bad-soft text-bad"><Alert size={13} /> Doesn&apos;t add up</span>
@@ -102,8 +102,10 @@ export default function Home() {
             Language models write pattern-shaped text without keeping a running total — that&apos;s why AI-generated patterns so often don&apos;t work. Stitchproof only trusts AI to translate. Every count is plain arithmetic you can check.
           </p>
         </div>
-        <div className="mt-12 grid items-start gap-10 lg:grid-cols-[1.25fr_1fr]">
-          <CountingMachine />
+        <div className="mt-12 grid items-start gap-10 lg:grid-cols-[1.4fr_1fr] lg:gap-14">
+          <div className="min-w-0">
+            <CountingMachine />
+          </div>
           <ol className="space-y-8">
             {[
               ["Read", "The offline reader understands standard notation. Only lines it can't read are sent to a small AI model, which rewrites them in strict notation — copying every number, never correcting it. The parser then checks that translation before anything is counted."],

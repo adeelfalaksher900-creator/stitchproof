@@ -275,3 +275,75 @@ body {
 .spin {
   animation: spin 0.9s linear infinite;
 }
+
+/* ---------- Anatomy figure, tuned to the Stitchproof palette ---------- */
+.iso.iso-themed {
+  --anatomy-page: var(--paper);
+  --anatomy-card: var(--surface);
+  --anatomy-text: var(--ink-2);
+  --anatomy-strong: var(--ink);
+  --anatomy-muted: var(--ink-3);
+  --anatomy-paper: #fcfbf8;
+  --anatomy-face: #ffffff;
+  --anatomy-top: #ffffff;
+  --anatomy-shade-0: #dad6cc;
+  --anatomy-shade-1: #e4e0d7;
+  --anatomy-shade-2: #ece9e1;
+  --anatomy-shade-3: #f4f2ec;
+  --anatomy-lit-top: #ffffff;
+  --anatomy-lit-shade: #eeebe4;
+  --anatomy-hi: #26241f;
+  --anatomy-mid: #8c877c;
+  --anatomy-lo: #b6b1a6;
+  --anatomy-faint: #d6d2c8;
+  --anatomy-lit: #000000;
+  --anatomy-halo: #8a8475;
+  --anatomy-halo-opacity: 0.32;
+  --anatomy-dot: #3a3833;
+  --anatomy-mono: var(--font-mono);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .iso.iso-themed {
+    --anatomy-paper: #1c1b18;
+    --anatomy-face: #24221f;
+    --anatomy-top: #252320;
+    --anatomy-shade-0: #141311;
+    --anatomy-shade-1: #181715;
+    --anatomy-shade-2: #1c1b18;
+    --anatomy-shade-3: #201f1c;
+    --anatomy-lit-top: #2f2d29;
+    --anatomy-lit-shade: #262420;
+    --anatomy-hi: #dcd8cf;
+    --anatomy-mid: #6f6b62;
+    --anatomy-lo: #45423c;
+    --anatomy-faint: #2f2d29;
+    --anatomy-lit: #ffffff;
+    --anatomy-halo: #050505;
+    --anatomy-halo-opacity: 0.85;
+    --anatomy-dot: #e6e2d9;
+  }
+}
+.iso.iso-themed .iso-plate {
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  border: 1px solid var(--line);
+  --anatomy-paper: var(--surface);
+}
+.iso.iso-themed .iso-legend {
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.iso-themed .marker {
+  fill: var(--accent);
+  stroke: var(--accent);
+  stroke-width: 0.6px;
+}
+.iso-themed [data-part="lamp"] .iso-top,
+.iso-themed [data-part="lamp"] .iso-shade {
+  transition: fill 260ms ease;
+}
+.iso-themed [data-part="lamp"][data-state="ok"] .iso-top { fill: var(--ok); }
+.iso-themed [data-part="lamp"][data-state="ok"] .iso-shade { fill: color-mix(in oklab, var(--ok) 75%, black); }
+.iso-themed [data-part="lamp"][data-state="bad"] .iso-top { fill: var(--bad); }
+.iso-themed [data-part="lamp"][data-state="bad"] .iso-shade { fill: color-mix(in oklab, var(--bad) 75%, black); }
+.iso-stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 12px; }

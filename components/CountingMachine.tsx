@@ -1,3 +1,8 @@
+import { buildMachine } from "@/lib/figure/machine";
+import { CountingMachineLive } from "./CountingMachineLive";
+
+/** Server component: builds the figure's static SVG once, then hands it to the live part. */
 export function CountingMachine() {
-  return <div className="card aspect-[4/3] w-full" aria-hidden />;
+  const { svg, P } = buildMachine();
+  return <CountingMachineLive svg={svg} P={P} />;
 }

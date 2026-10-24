@@ -2,7 +2,7 @@
 
 **A compiler for knitting patterns.** Paste a pattern; Stitchproof reads it, counts every stitch in every size, and shows exactly where the numbers don't add up — with the fix.
 
-- **Live app:** https://stitchproof.vercel.app
+- **Live app:** https://stitchproof-alpha.vercel.app
 - **Built for:** Devpost — *Build With AI: Basics* (made with the Devpost Learn Skill Pack; planning docs in [`devpost/`](devpost/))
 
 > AI reads the words. Code counts the stitches.
@@ -114,19 +114,22 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-The offline reader, counter, fixer and Knit mode work with no configuration. To use the AI reader locally, copy `.env.example` to `.env.local` and set `AI_GATEWAY_API_KEY` (create one in the Vercel dashboard under AI Gateway).
+The offline reader, counter, fixer and Knit mode work with no configuration. To use the AI reader, copy `.env.example` to `.env.local` and set **one** of:
+
+- `GOOGLE_GENERATIVE_AI_API_KEY` — a free Google Gemini key (default model `gemini-flash-latest`, override with `GEMINI_MODEL`), or
+- `AI_GATEWAY_API_KEY` — a Vercel AI Gateway key (on Vercel, the deployment's OIDC token is used automatically).
 
 ## Tests
 
 ```bash
 npm test             # unit tests (Vitest)
 npm run build && npm run test:e2e   # end-to-end (Playwright, desktop + mobile)
-BASE_URL=https://stitchproof.vercel.app npx playwright test   # against production
+BASE_URL=https://stitchproof-alpha.vercel.app npx playwright test   # against production
 ```
 
 ## Deploy
 
-Import the repository into Vercel (framework: Next.js). No environment variables are required: AI Gateway uses the deployment's OIDC token. Optionally set `STITCHPROOF_MODEL`.
+Import the repository into Vercel (framework: Next.js). For the AI reader, either add `GOOGLE_GENERATIVE_AI_API_KEY`, or enable AI Gateway on the team (its OIDC token is picked up automatically; optionally set `STITCHPROOF_MODEL`).
 
 ## Notation it reads offline
 
@@ -152,6 +155,11 @@ Import the repository into Vercel (framework: Next.js). No environment variables
 ## Built with AI — disclosure
 
 This project was planned and built with an AI coding agent (Claude) using the Devpost Learn Skill Pack, per the hackathon's rules. The planning documents in `devpost/` record which decisions were delegated. No pre-existing project code was used.
+
+## Third-party code
+
+- `lib/iso/iso-kit.ts` and `app/iso.css` are the isometric drawing kit from the [Anatomy](https://github.com/wheresryan22/anatomy) skill (MIT, © 2026 Ryan; license in `lib/iso/LICENSE`), used unmodified to draw Fig 1. The figure itself (`lib/figure/machine.ts`) was designed for this project.
+- Fonts: Inter, Instrument Serif and JetBrains Mono via Fontsource (SIL Open Font License).
 
 ## License
 
