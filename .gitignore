@@ -1,0 +1,30 @@
+# Devpost Learn — personal learning context stays out of commits
+/devpost/learner-profile.md
+
+# Local credentials (a secret-free .env.example is allowed)
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Vercel
+.vercel
+
+# OS / editor
+.DS_Store
+*.log
+test-results/
+playwright-report/
+shots/
+
+# Skill copies for other agent harnesses (the pack itself lives in .agents/skills)
+/agent/
+/.claude/
