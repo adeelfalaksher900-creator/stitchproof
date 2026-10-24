@@ -30,6 +30,8 @@ Stitchproof checks the arithmetic for you — without trusting a language model 
 | **Shape preview** | The piece's silhouette, row by row, for the selected size. |
 | **Plain English** | Any row expands into words, with the repeat counts worked out ("repeat [purl 2, knit 2] until 5 stitches remain — that's 9 times"). |
 | **Knit mode** | One row at a time, with the count to expect. Your place is saved in the browser. |
+| **Share links** | "Share proof" copies a link with the whole pattern compressed into the URL fragment, so a designer can send a proof to test knitters — nothing is uploaded or stored. |
+| **Notation guide** | "What can I paste?" lists exactly what the offline reader understands and what it marks *can't verify*. |
 | **AI reader** | Messy prose ("knit every row until…") is translated by a small model into strict notation, which the parser then checks. Every number is copied, never corrected. |
 
 <p align="center"><img src="docs/knit.png" alt="Knit mode: one round at a time in plain English, with the count to expect" width="49%"> <img src="docs/figure.png" alt="Fig 1, the stitch counter: type slugs as wide as the stitches they use, one pin per stitch they make" width="49%"></p>
@@ -123,6 +125,19 @@ The offline reader, counter, fixer and Knit mode work with no configuration. To 
 - `GOOGLE_GENERATIVE_AI_API_KEY` — a free Google Gemini key (default model `gemini-flash-latest`, override with `GEMINI_MODEL`), or
 - `AI_GATEWAY_API_KEY` — a Vercel AI Gateway key (on Vercel, the deployment's OIDC token is used automatically).
 
+## Accuracy
+
+Measured, not claimed. Every number in six correct patterns (cast-ons, repeat counts, stitch counts and stated totals, in every size) is changed by ±1 and ±2, and Stitchproof proofs and fixes each broken copy on its own:
+
+| | |
+|---|---|
+| Single-number typos | 450 |
+| Typos that change a stitch count, caught | 423 / 423 (100%) |
+| Of those, repaired so every row adds up | 423 / 423 (100%) |
+| Restored to the designer's exact original text | 378 / 423 (89.4%) |
+
+The other 27 typos change no stitch count (e.g. how many plain rows to knit), so no count-based check can see them. The harness is [`lib/stitch/evaluate.ts`](lib/stitch/evaluate.ts); run it with `npx tsx scripts/eval-fixer.ts`. The home page recomputes these numbers on every build, and a unit test fails if detection or repair drops below 100%.
+
 ## Tests
 
 ```bash
@@ -141,13 +156,14 @@ Import the repository into Vercel (framework: Next.js). For the AI reader, eithe
 |---|---|
 | `CO 80 (88, 96) sts.` | cast on, one number per size |
 | `Row 3 (RS): …` / `Rnd 3: …` / `Rows 3–12: …` / `Next row: …` | rows, rounds, ranges |
-| `k2, p2, k2tog, ssk, yo, m1l, m1r, kfb, sk2p, cdd, sl1, k1tbl…` | stitches |
+| `Row 2 and all WS rows: Purl.` | a rule for every wrong-side row |
+| `k2, p2, k2tog, ssk, yo, m1l, m1r, lli, rli, kfb, kfbf, sk2p, cdd, sl1 kwise, k2tog tbl, psso…` | stitches |
 | `*k2, p2; rep from * to end` / `to last 3 sts` / `3 more times` / `around` | star repeats |
 | `[k1, p1] 5 times` / `[k1, p1] to end` | bracket repeats |
-| `k to end`, `p to last 2 sts`, `Knit.` | whole/partial rows |
+| `k to end`, `p to last 2 sts`, `k to last st`, `Knit.` | whole/partial rows |
 | `Rows 5–20: Rep rows 3–4.` / `Rep last 2 rows 4 more times.` | row repeats |
 | `(72 (81, 90) sts)` / `— 72 sts` | stated counts |
-| `w&t`, `work even until 6 in` | marked *can't verify* (never guessed) |
+| `w&t`, `work even until 6 in`, `rep rows 1–2 until…` | marked *can't verify* (never guessed) |
 
 ## Limitations
 

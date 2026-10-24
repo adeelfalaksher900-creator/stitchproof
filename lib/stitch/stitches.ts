@@ -40,6 +40,11 @@ export const STITCHES: Record<string, StitchDef> = {
   kfb: { uses: 1, makes: 2, name: "knit front and back (increase)", mark: "inc" },
   pfb: { uses: 1, makes: 2, name: "purl front and back (increase)", mark: "inc" },
   kyok: { uses: 1, makes: 3, name: "knit, yarn over, knit into the same stitch", mark: "inc" },
+  kfbf: { uses: 1, makes: 3, name: "knit front, back and front (double increase)", mark: "inc" },
+  lli: { uses: 0, makes: 1, name: "left lifted increase", mark: "inc" },
+  rli: { uses: 0, makes: 1, name: "right lifted increase", mark: "inc" },
+  // Passing a slipped stitch over takes one stitch off the right needle.
+  psso: { uses: 0, makes: -1, name: "pass the slipped stitch over", mark: "decL" },
 };
 
 /** Aliases a knitter might write, mapped to canonical codes. */
@@ -63,7 +68,19 @@ export const ALIASES: Record<string, string> = {
   "m1lp": "m1p",
   "m1rp": "m1p",
   "inc": "kfb",
-  "k2tog-tbl": "ssk",
+  "k2tog-tbl": "k2tog",
+  "k2togtbl": "k2tog",
+  "p2togtbl": "p2tog",
+  "s2kp2": "s2kp",
+  "sl1k2togpsso": "sk2p",
+  "sl1-k2tog-psso": "sk2p",
+  "sl1k1psso": "skp",
+  "sl1kwise": "sl",
+  "sl1pwise": "sl",
+  "sl1wyif": "sl-wyif",
+  "sl1wyib": "sl-wyib",
+  "m1pl": "m1p",
+  "m1pr": "m1p",
 };
 
 /** Stitch codes ordered longest first, so "k2tog" wins over "k". */

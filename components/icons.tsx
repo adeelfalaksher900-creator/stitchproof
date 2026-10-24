@@ -65,6 +65,9 @@ export const Trash = ({ size, ...p }: P) => (
 export const Sparkline = ({ size, ...p }: P) => (
   <svg {...base(size)} {...p}><path d="M4 18h16" /><path d="M6 15h12M8 12h8M10 9h4" /></svg>
 );
+export const Link2 = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>
+);
 export const Lock = ({ size, ...p }: P) => (
   <svg {...base(size)} {...p}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
 );

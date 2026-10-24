@@ -98,3 +98,4 @@ Activity mode: Recap.
 - Production URL is `stitchproof-alpha.vercel.app` — `stitchproof.vercel.app` was already taken.
 - Vercel AI Gateway won't serve requests until the team has a card on file, so the AI reader also accepts a free Google Gemini key (`GOOGLE_GENERATIVE_AI_API_KEY`); the route tries Gemini first when set.
 - The sandbox couldn't push to GitHub, so code reaches the repository through GitHub's web uploader; the first upload consolidated the local history into one commit, and later changes are committed one change at a time.
+- Judge-style audit round 1 found three gaps, now built: a fixer evaluation on deliberately broken patterns (published on the home page and in the README), private share links (pattern in the URL fragment, nothing stored), and a "What can I paste?" notation guide. The reader also learned "Row 2 and all WS rows", "to last st", "until" lines and more stitch spellings.

@@ -117,6 +117,7 @@ function readRepeatSpec(src: Slice): RepeatSpec | null {
   if (/^(to end|to the end|across|around|to end of (row|rnd|round)|all around|to end of the (row|rnd|round))$/.test(s)) {
     return { kind: "toEnd", leave: zero() };
   }
+  if (/^to (?:the )?last (st|stitch)$/.test(s)) return { kind: "toEnd", leave: one() };
   const last = /^to (?:the )?last\s+/.exec(s);
   if (last) {
     const c = readSized(slice(t, last[0].length));
@@ -179,6 +180,12 @@ function readItem(src: Slice): Op {
   if (whole && (whole[2] !== undefined || /^(knit|purl)$/.test(lower))) {
     const code = whole[1].startsWith("k") ? (whole[1] === "ktbl" ? "ktbl" : "k") : whole[1] === "ptbl" ? "ptbl" : "p";
     return { t: "toEnd", code, leave: zero() };
+  }
+  const toLastOne = /^([a-z0-9-]+?)\s+to (?:the )?last (?:st|stitch)$/.exec(lower);
+  if (toLastOne) {
+    const code = codeOf(toLastOne[1]);
+    if (!code) throw new ReadError(`Unknown stitch "${toLastOne[1]}"`);
+    return { t: "toEnd", code, leave: one() };
   }
   const toLast = /^([a-z0-9-]+?)\s+to (?:the )?last\s+/.exec(lower);
   if (toLast) {
@@ -376,6 +383,9 @@ const LAST_ROWS_RE =
 const ROWS_FROM_RE =
   /^rep(?:eat)?\s+(rows?|rnds?|rounds?)\s+(\d+)\s*(?:-|–|—|to|through|and)\s*(\d+)\s+(.+?)$/i;
 
+const EVERY_RE =
+  /^(row|rnd|round)\s+(\d+)\s*\(?\s*(?:and|&)\s+(?:all|every|each)\s+(?:(?:following|foll|subsequent|remaining|other)\s+)?(rs|ws|right[- ]side|wrong[- ]side|even[- ]numbered|odd[- ]numbered|even|odd)\s+(?:rows?|rnds?|rounds?)\s*\)?\s*(?:\(\s*(rs|ws)\s*\))?\s*[:.]\s*/i;
+
 const SECTION_HINT = /\b(k\d|p\d|knit|purl|k2tog|ssk|yo|rep|cast on|bind off|bo\b|co\b|row|rnd|round|stitch|sts|inc|dec|work even|continue)\b/i;
 
 export interface ParseOptions {
@@ -396,6 +406,10 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
   let round = false;
   let keySeq = 0;
   const byNumber = new Map<number, Row>();
+  // "Row 2 and all WS rows: Purl." — rows of that parity left out later follow this row.
+  let rule: { start: number; row: Row } | null = null;
+  let skipFill = false;
+  const ruleCovers = (n: number) => rule !== null && n > rule.start && (n - rule.start) % 2 === 0;
 
   const nextKey = () => `r${++keySeq}`;
 
@@ -413,6 +427,18 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
   };
 
   const pushRow = (row: Row) => {
+    if (rule && row.number !== null && !skipFill) {
+      for (let k = lastNumber + 1; k < row.number; k++) {
+        if (!ruleCovers(k)) continue;
+        const implied: Row = {
+          ...rule.row, key: nextKey(), label: `${round ? "Rnd" : "Row"} ${k}`, number: k,
+          declared: undefined, round, copyOf: rule.row.key,
+        };
+        rows.push(implied);
+        byNumber.set(k, implied);
+      }
+    }
+    if (row.number !== null) skipFill = false;
     rows.push(row);
     if (row.number !== null) {
       byNumber.set(row.number, row);
@@ -423,7 +449,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
   const copyRows = (from: number, to: number, startNumber: number, count: number, line: number, source: string, declared?: SizedRef) => {
     const cycle: Row[] = [];
     for (let n = from; n <= to; n++) {
-      const r = byNumber.get(n);
+      const r = byNumber.get(n) ?? (ruleCovers(n) ? rule!.row : undefined);
       if (!r) throw new ReadError(`Row ${n} hasn't been defined yet`);
       cycle.push(r);
     }
@@ -444,6 +470,14 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         copyOf: src.key,
       });
     }
+  };
+
+  const pushUntil = (li: number, source: string) => {
+    pushRow({
+      key: nextKey(), label: "Work to length", number: null, line: li, round, ops: [], source,
+      unverifiable: "Worked to a measurement, so the number of rows isn't fixed",
+    });
+    skipFill = true;
   };
 
   for (let li = 0; li < lines.length; li++) {
@@ -513,6 +547,10 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
       // "Rep last 2 rows 3 more times." / "Rep rows 1–2 four more times."
       const lastM = LAST_ROWS_RE.exec(stripTrailing(line).s);
       const fromM = ROWS_FROM_RE.exec(stripTrailing(line).s);
+      if ((lastM || fromM) && /\buntil\b/i.test(lastM ? lastM[3] : fromM![4])) {
+        pushUntil(li, line.s);
+        continue;
+      }
       if (lastM || fromM) {
         const spec = readRepeatSpec({ s: (lastM ? lastM[3] : fromM![4]), at: 0 });
         if (!spec || spec.kind !== "times") throw new ReadError("Couldn't read how many times to repeat");
@@ -536,6 +574,29 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
       const unsure = /^unsure\s*:\s*(.*)$/i.exec(line.s);
       if (unsure) {
         unread.push({ line: li, text: unsure[1] || line.s, reason: "The AI reader wasn't sure how to translate this, so it wasn't guessed" });
+        continue;
+      }
+
+      if (/^(work|continue|cont|knit|purl)\b.*\buntil\b/i.test(line.s) && !ROW_HEAD_RE.test(line.s)) {
+        pushUntil(li, line.s);
+        continue;
+      }
+
+      const every = EVERY_RE.exec(line.s);
+      if (every) {
+        const { rest, declared } = readDeclared(stripTrailing(trim(slice(line, every[0].length))));
+        noteSizes(declared);
+        const ops = readSeq(rest);
+        noteOps(ops);
+        if (ops.length === 0) throw new ReadError("No stitches in this row");
+        const kind = every[1].toLowerCase();
+        round = /rnd|round/.test(kind);
+        const which = every[3].toLowerCase();
+        const side = (every[4]?.toUpperCase() as Side | undefined) ?? (/^(ws|wrong)/.test(which) ? "WS" : /^(rs|right)/.test(which) ? "RS" : undefined);
+        const number = Number(every[2]);
+        const row: Row = { key: nextKey(), label: `${round ? "Rnd" : "Row"} ${number}`, number, line: li, side, round, ops, declared, source: line.s };
+        pushRow(row);
+        rule = { start: number, row };
         continue;
       }
 
@@ -572,11 +633,12 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
           : undefined;
 
       // "Rows 3–12: rep rows 1–2."
-      const rr = ROW_REPEAT_RE.exec(bodyStripped.s);
+      const pre = readDeclared(bodyStripped);
+      const rr = ROW_REPEAT_RE.exec(stripTrailing(pre.rest).s);
       if (rr) {
         const from = Number(rr[1]);
         const to = rr[2] ? Number(rr[2]) : from;
-        const { declared } = readDeclared(bodyStripped);
+        const { declared } = pre;
         noteSizes(declared);
         const count = end !== null && start !== null ? end - start + 1 : 1;
         copyRows(from, to, start ?? lastNumber + 1, count, li, line.s, declared);

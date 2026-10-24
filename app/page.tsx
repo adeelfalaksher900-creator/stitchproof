@@ -4,6 +4,8 @@ import { Alert, Arrow, Check, Lock, Wand } from "@/components/icons";
 import { REPO_URL } from "@/components/TopBar";
 import { SAMPLES } from "@/lib/samples";
 import { findErrata } from "@/lib/stitch/errata";
+import { evaluateFixer } from "@/lib/stitch/evaluate";
+import { CLEAN_PATTERNS } from "@/lib/stitch/fixtures";
 import { proofText } from "@/lib/stitch/proof";
 
 /** A real result, computed from the sample pattern by the same engine the app uses. */
@@ -124,6 +126,9 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ---------- Accuracy, measured at build time ---------- */}
+      <Accuracy />
+
       {/* ---------- Who it's for ---------- */}
       <section className="bg-paper-2/60 py-20 lg:py-24">
         <div className="mx-auto grid max-w-[1200px] gap-5 px-4 sm:px-6 md:grid-cols-3">
@@ -158,5 +163,44 @@ export default function Home() {
         </div>
       </footer>
     </div>
+  );
+}
+
+/** Every number here is computed from the real engine when the site is built. */
+function Accuracy() {
+  const r = evaluateFixer(CLEAN_PATTERNS);
+  const visible = r.total - r.invisible;
+  const pct = (a: number, b: number) => `${Math.round((1000 * a) / b) / 10}%`;
+  const stats: [string, string][] = [
+    [String(r.total), `single-number typos, made in ${Object.keys(CLEAN_PATTERNS).length} correct patterns`],
+    [pct(r.detected, visible), `of the ${visible} typos that change a stitch count were caught`],
+    [pct(r.repaired, r.detected), "of those were repaired so every row adds up again"],
+    [pct(r.restored, r.detected), "were restored to the designer's exact original text"],
+  ];
+  return (
+    <section className="border-y border-line bg-surface">
+      <div className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 lg:py-20">
+        <div className="max-w-2xl">
+          <p className="text-[13px] font-semibold tracking-wide text-accent uppercase">Measured, not claimed</p>
+          <h2 className="mt-3 text-[30px] leading-tight font-semibold tracking-[-0.03em] sm:text-[36px]">We broke correct patterns on purpose.</h2>
+          <p className="mt-3 text-[15.5px] leading-relaxed text-ink-2">
+            Every number in six correct patterns — cast-ons, repeat counts, stitch counts and stated totals, in every size — was changed by ±1 and ±2, the
+            typos designers actually make. Then Stitchproof proofed and fixed each broken copy on its own.
+          </p>
+        </div>
+        <dl className="mt-10 grid grid-cols-2 gap-x-4 gap-y-6 sm:gap-6 lg:grid-cols-4">
+          {stats.map(([big, small]) => (
+            <div key={small} className="border-t-2 border-ink pt-4">
+              <dt className="text-[34px] font-semibold tracking-[-0.03em] tnum">{big}</dt>
+              <dd className="mt-1 text-[14px] leading-snug text-ink-2">{small}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-8 text-[12.5px] text-ink-3">
+          The other {r.invisible} typos change no stitch count (for example, how many plain rows to knit), so no count-based check can see them. Recomputed on
+          every build by <span className="mono">lib/stitch/evaluate.ts</span>; run it yourself with <span className="mono">npx tsx scripts/eval-fixer.ts</span>.
+        </p>
+      </div>
+    </section>
   );
 }

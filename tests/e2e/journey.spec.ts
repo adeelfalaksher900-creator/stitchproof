@@ -66,3 +66,29 @@ test.describe("core journey", () => {
     await expect(page.getByText(/Showing what the offline reader could read/)).toBeVisible();
   });
 });
+
+test.describe("sharing and help", () => {
+  test("a share link opens the same proof in a fresh browser", async ({ page, browser, browserName }) => {
+    test.skip(browserName !== "chromium", "clipboard permissions are Chromium-only here");
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.goto("/proof?sample=beanie&run=1");
+    await page.getByRole("button", { name: /Share proof/ }).click();
+    await expect(page.getByText(/Share link copied/)).toBeVisible();
+    const url = await page.evaluate(() => navigator.clipboard.readText());
+    expect(url).toContain("/proof#p=");
+    const fresh = await browser.newContext();
+    const other = await fresh.newPage();
+    await other.goto(url);
+    await expect(other.getByText(/Opened a shared pattern/)).toBeVisible();
+    await expect(other.getByRole("heading", { name: "3 errata found across 3 sizes." })).toBeVisible();
+    await fresh.close();
+  });
+
+  test("the notation guide opens and closes", async ({ page }) => {
+    await page.goto("/proof");
+    await page.getByRole("button", { name: /What can I paste/ }).click();
+    await expect(page.getByRole("dialog", { name: "What Stitchproof reads" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+});

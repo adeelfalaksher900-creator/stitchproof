@@ -8,8 +8,10 @@ import { SAMPLES } from "@/lib/samples";
 import { findErrata, type Erratum } from "@/lib/stitch/errata";
 import { findFixes } from "@/lib/stitch/fixes";
 import { proofProgram, type Proof } from "@/lib/stitch/proof";
+import { readShared, shareUrl } from "@/lib/share";
 import { load, newId, save, titleOf } from "@/lib/store";
-import { Alert, Arrow, Check, Lock, Needles, Question, Wand } from "./icons";
+import { Alert, Arrow, Check, Link2, Lock, Needles, Question, Wand } from "./icons";
+import { NotationGuide } from "./NotationGuide";
 import { PatternEditor, type EditorHandle, type LineMark } from "./PatternEditor";
 import { RowList } from "./RowList";
 import { ShapePreview } from "./ShapePreview";
@@ -105,7 +107,17 @@ export function ProofWorkspace() {
     started.current = true;
     const sample = params.get("sample");
     const id = params.get("id");
-    if (sample) {
+    if (window.location.hash.startsWith("#p=")) {
+      void readShared(window.location.hash).then((shared) => {
+        if (!shared) {
+          setError("This share link is damaged, so the pattern couldn't be opened.");
+          return;
+        }
+        setText(shared);
+        setNotice("Opened a shared pattern. It came inside the link — nothing was downloaded from a server — and it's now saved in this browser.");
+        void run(shared, { id: newId() });
+      });
+    } else if (sample) {
       const s = SAMPLES.find((x) => x.id === sample);
       if (s) {
         setText(s.text);
@@ -197,7 +209,10 @@ export function ProofWorkspace() {
         <section aria-label="Pattern" className="lg:sticky lg:top-20 lg:self-start">
           <div className="card flex h-[460px] flex-col overflow-hidden lg:h-[calc(100dvh-7.5rem)]">
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
-              <h1 className="mr-auto text-[15px] font-semibold tracking-[-0.01em]">Pattern</h1>
+              <h1 className="text-[15px] font-semibold tracking-[-0.01em]">Pattern</h1>
+              <span className="mr-auto">
+                <NotationGuide />
+              </span>
               <div className="segmented" role="group" aria-label="Reader">
                 <button type="button" aria-pressed={mode === "auto"} onClick={() => setMode("auto")} title="Offline reader first; AI only for lines it can't read">
                   Auto
@@ -280,6 +295,15 @@ export function ProofWorkspace() {
                 elapsed={elapsed}
                 errata={errata}
                 onApplyAll={applyAll}
+                onShare={async () => {
+                  try {
+                    const url = await shareUrl(reading.readBy === "ai" ? reading.readingText : proofedText);
+                    await navigator.clipboard.writeText(url);
+                    setNotice("Share link copied. The pattern travels inside the link itself — nothing is uploaded. Anyone who opens it sees this proof.");
+                  } catch {
+                    setError("Couldn't copy the link. Your browser may block clipboard access on this page.");
+                  }
+                }}
                 patternId={patternId}
                 onSelect={setSelectedKey}
                 selectedKey={selectedKey}
@@ -404,7 +428,7 @@ function EmptyState({ onSample }: { onSample: (id: string) => void }) {
 }
 
 function Summary({
-  proof, reading, sizeIndex, setSizeIndex, elapsed, errata, onApplyAll, patternId, onSelect, selectedKey,
+  proof, reading, sizeIndex, setSizeIndex, elapsed, errata, onApplyAll, onShare, patternId, onSelect, selectedKey,
 }: {
   proof: Proof;
   reading: Reading;
@@ -413,6 +437,7 @@ function Summary({
   elapsed: number | null;
   errata: { list: Erratum[]; fixedText: string | null } | null;
   onApplyAll: () => void;
+  onShare: () => void;
   patternId: string | null;
   onSelect: (k: string | null) => void;
   selectedKey: string | null;
@@ -486,6 +511,11 @@ function Summary({
               <Link href={`/knit/${patternId}`} className={`btn ${verdict === "issues" ? "btn-secondary" : "btn-primary"}`}>
                 Start knitting <Arrow size={16} />
               </Link>
+            )}
+            {verdict !== "empty" && (
+              <button type="button" className="btn btn-ghost" onClick={onShare} title="Copy a private link with this pattern inside it">
+                <Link2 size={16} /> Share proof
+              </button>
             )}
           </div>
         </div>
@@ -611,7 +641,9 @@ function UnreadList({ reading }: { reading: Reading }) {
         <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
           {unread.length} {unread.length === 1 ? "line" : "lines"} not counted
         </h2>
-        <span className="ml-auto text-[12px] text-ink-3">Never guessed</span>
+        <span className="ml-auto">
+          <NotationGuide label="What it reads" />
+        </span>
       </div>
       <ul className="divide-y divide-line">
         {unread.map((u) => (
