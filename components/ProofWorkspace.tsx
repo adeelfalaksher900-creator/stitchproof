@@ -12,6 +12,7 @@ import { readShared, shareUrl } from "@/lib/share";
 import { load, newId, save, titleOf } from "@/lib/store";
 import { Alert, Arrow, Check, Link2, Lock, Needles, Question, Wand } from "./icons";
 import { NotationGuide } from "./NotationGuide";
+import { AiKey } from "./AiKey";
 import { PatternEditor, type EditorHandle, type LineMark } from "./PatternEditor";
 import { RowList } from "./RowList";
 import { ShapePreview } from "./ShapePreview";
@@ -50,7 +51,7 @@ export function ProofWorkspace() {
         return;
       }
       if (input.length > MAX_CHARS) {
-        setError(`Patterns are limited to ${MAX_CHARS.toLocaleString()} characters — this one has ${input.length.toLocaleString()}.`);
+        setError(`Patterns are limited to ${MAX_CHARS.toLocaleString()} characters, and this one has ${input.length.toLocaleString()}.`);
         return;
       }
       abort.current?.abort();
@@ -114,7 +115,7 @@ export function ProofWorkspace() {
           return;
         }
         setText(shared);
-        setNotice("Opened a shared pattern. It came inside the link — nothing was downloaded from a server — and it's now saved in this browser.");
+        setNotice("Opened a shared pattern. It came inside the link, nothing was downloaded from a server, and it's now saved in this browser.");
         void run(shared, { id: newId() });
       });
     } else if (sample) {
@@ -139,11 +140,19 @@ export function ProofWorkspace() {
       setErrata(proof ? { list: [], fixedText: null } : null);
       return;
     }
-    const handle = setTimeout(() => {
-      const { errata: list, fixedText } = findErrata(reading.readingText, proof);
-      setErrata({ list, fixedText });
-    }, 30);
-    return () => clearTimeout(handle);
+    const done = ({ errata: list, fixedText }: ReturnType<typeof findErrata>) => setErrata({ list, fixedText });
+    const inline = () => done(findErrata(reading.readingText, proof));
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL("../lib/stitch/errata.worker.ts", import.meta.url));
+    } catch {
+      const handle = setTimeout(inline, 30);
+      return () => clearTimeout(handle);
+    }
+    worker.onmessage = (e) => done(e.data);
+    worker.onerror = inline;
+    worker.postMessage({ text: reading.readingText, proof });
+    return () => worker.terminate();
   }, [proof, reading]);
 
   const marks = useMemo(() => {
@@ -210,8 +219,9 @@ export function ProofWorkspace() {
           <div className="card flex h-[460px] flex-col overflow-hidden lg:h-[calc(100dvh-7.5rem)]">
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
               <h1 className="text-[15px] font-semibold tracking-[-0.01em]">Pattern</h1>
-              <span className="mr-auto">
+              <span className="mr-auto flex items-center gap-3">
                 <NotationGuide />
+                <AiKey />
               </span>
               <div className="segmented" role="group" aria-label="Reader">
                 <button type="button" aria-pressed={mode === "auto"} onClick={() => setMode("auto")} title="Offline reader first; AI only for lines it can't read">
@@ -299,7 +309,7 @@ export function ProofWorkspace() {
                   try {
                     const url = await shareUrl(reading.readBy === "ai" ? reading.readingText : proofedText);
                     await navigator.clipboard.writeText(url);
-                    setNotice("Share link copied. The pattern travels inside the link itself — nothing is uploaded. Anyone who opens it sees this proof.");
+                    setNotice("Share link copied. The pattern travels inside the link itself, so nothing is uploaded. Anyone who opens it sees this proof.");
                   } catch {
                     setError("Couldn't copy the link. Your browser may block clipboard access on this page.");
                   }
@@ -312,7 +322,8 @@ export function ProofWorkspace() {
               {reading.aiNote && (
                 <div className="card flex items-start gap-3 border-warn/30 bg-warn-soft px-5 py-3.5 text-[13.5px] text-warn">
                   <Alert size={16} className="mt-0.5 shrink-0" />
-                  {reading.aiNote}
+                  <span className="min-w-0 flex-1">{reading.aiNote}</span>
+                  {mode === "auto" && <AiKey label="Use my key" />}
                 </div>
               )}
 
@@ -369,7 +380,7 @@ function Spinner() {
 function Stages({ stage }: { stage: Stage }) {
   const steps: { id: Stage; label: string; detail: string }[] = [
     { id: "offline", label: "Reading", detail: "The offline reader parses standard notation" },
-    { id: "ai", label: "AI translation", detail: "Only for lines the offline reader couldn't read — then checked by the parser" },
+    { id: "ai", label: "AI translation", detail: "Only for lines the offline reader couldn't read, then checked by the parser" },
     { id: "counting", label: "Counting rows", detail: "Every row, every size, by plain arithmetic" },
   ];
   const order: Stage[] = ["offline", "ai", "counting"];
@@ -581,7 +592,7 @@ function ErrataList({
           </div>
           {e.fix ? (
             <div className="border-t border-line bg-surface-2 px-5 py-4">
-              <p className="text-[12px] font-semibold tracking-wide text-accent uppercase">Suggested fix</p>
+              <p className="text-[12.5px] font-semibold text-ink-2">Suggested fix</p>
               <p className="mt-1 text-[14px] font-medium text-ink">{e.fix.description}</p>
               <DiffLine before={e.fix.lineBefore} after={e.fix.lineAfter} />
               <p className="mt-2 text-[12.5px] leading-relaxed text-ink-2">{e.fix.evidence}</p>
@@ -593,7 +604,7 @@ function ErrataList({
             </div>
           ) : (
             <div className="border-t border-line bg-surface-2 px-5 py-3 text-[12.5px] text-ink-3">
-              No single-number edit makes this row work — it needs a closer look.
+              No single-number edit makes this row work. It needs a closer look.
             </div>
           )}
         </article>
@@ -665,7 +676,7 @@ function ReadingDisclosure({ reading }: { reading: Reading }) {
       <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-[14px] font-semibold tracking-[-0.01em]">
         How Stitchproof read this
         <span className="text-[12px] font-normal text-ink-3">
-          AI translation{reading.attempts && reading.attempts > 1 ? `, repaired once after the parser flagged it` : ""} — every number copied, not corrected
+          AI translation{reading.attempts && reading.attempts > 1 ? `, repaired once after the parser flagged it` : ""}. Every number copied, not corrected
         </span>
         <span className="ml-auto text-ink-3 transition-transform group-open:rotate-90">›</span>
       </summary>

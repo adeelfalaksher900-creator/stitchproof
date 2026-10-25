@@ -148,7 +148,7 @@ BASE_URL=https://stitchproof-alpha.vercel.app npx playwright test   # against pr
 
 ## Deploy
 
-Import the repository into Vercel (framework: Next.js). For the AI reader, either add `GOOGLE_GENERATIVE_AI_API_KEY`, or enable AI Gateway on the team (its OIDC token is picked up automatically; optionally set `STITCHPROOF_MODEL`).
+Import the repository into Vercel (framework: Next.js). For the AI reader, visitors can paste their own Gemini key under **AI key** on the Proof page (kept only in their browser, sent only with AI readings, never stored or logged by the server). To turn it on for everyone, add `GOOGLE_GENERATIVE_AI_API_KEY`, or enable AI Gateway on the team (its OIDC token is picked up automatically; optionally set `STITCHPROOF_MODEL`).
 
 ## Notation it reads offline
 

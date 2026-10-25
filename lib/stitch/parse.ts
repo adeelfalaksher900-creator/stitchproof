@@ -11,6 +11,16 @@ import type { Op, Program, Row, Side, SizedRef, Span, Unread } from "./types";
 
 class ReadError extends Error {}
 
+// Real patterns stay far below these; the caps keep a pasted "Rows 1–999999999" from freezing the tab.
+const MAX_NUMBER = 5000;
+const MAX_ROWS = 5000;
+
+function num(digits: string): number {
+  const n = Number(digits);
+  if (n > MAX_NUMBER) throw new ReadError(`${digits} is too large to be a row or stitch count`);
+  return n;
+}
+
 const WORD_NUMBERS: Record<string, number> = {
   once: 1, twice: 2, thrice: 3,
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -46,7 +56,7 @@ const SIZED_RE = /^(\d+)(?:\s*\(\s*(\d+(?:\s*,\s*\d+)*)\s*\)|((?:\s*\/\s*\d+)+))
 function readSized(src: Slice): { ref: SizedRef; length: number } | null {
   const m = SIZED_RE.exec(src.s);
   if (!m) return null;
-  const values: number[] = [Number(m[1])];
+  const values: number[] = [num(m[1])];
   const spans: Span[] = [{ start: src.at, end: src.at + m[1].length }];
   const rest = m[2] ?? m[3];
   if (rest) {
@@ -55,7 +65,7 @@ function readSized(src: Slice): { ref: SizedRef; length: number } | null {
     const numRe = /\d+/g;
     let nm: RegExpExecArray | null;
     while ((nm = numRe.exec(rest))) {
-      values.push(Number(nm[0]));
+      values.push(num(nm[0]));
       const start = src.at + restStart + nm.index;
       spans.push({ start, end: start + nm[0].length });
     }
@@ -427,6 +437,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
   };
 
   const pushRow = (row: Row) => {
+    if (rows.length >= MAX_ROWS) throw new ReadError(`Stitchproof checks up to ${MAX_ROWS.toLocaleString("en-US")} rows`);
     if (rule && row.number !== null && !skipFill) {
       for (let k = lastNumber + 1; k < row.number; k++) {
         if (!ruleCovers(k)) continue;
@@ -558,13 +569,13 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         let from: number;
         let to: number;
         if (lastM) {
-          const n = /^\d+$/.test(lastM[1]) ? Number(lastM[1]) : WORD_NUMBERS[lastM[1].toLowerCase()];
+          const n = /^\d+$/.test(lastM[1]) ? num(lastM[1]) : WORD_NUMBERS[lastM[1].toLowerCase()];
           if (!n) throw new ReadError("Couldn't read how many rows to repeat");
           to = lastNumber;
           from = lastNumber - n + 1;
         } else {
-          from = Number(fromM![2]);
-          to = Number(fromM![3]);
+          from = num(fromM![2]);
+          to = num(fromM![3]);
         }
         const total = spec.ref.values[0] * (to - from + 1);
         copyRows(from, to, lastNumber + 1, total, li, line.s);
@@ -593,7 +604,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         round = /rnd|round/.test(kind);
         const which = every[3].toLowerCase();
         const side = (every[4]?.toUpperCase() as Side | undefined) ?? (/^(ws|wrong)/.test(which) ? "WS" : /^(rs|right)/.test(which) ? "RS" : undefined);
-        const number = Number(every[2]);
+        const number = num(every[2]);
         const row: Row = { key: nextKey(), label: `${round ? "Rnd" : "Row"} ${number}`, number, line: li, side, round, ops, declared, source: line.s };
         pushRow(row);
         rule = { start: number, row };
@@ -615,8 +626,8 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
       const isNext = kind.startsWith("next");
       const isSetup = kind.startsWith("set");
       const sideRaw = (head[4] ?? head[5] ?? head[6])?.toUpperCase() as Side | undefined;
-      let start: number | null = head[2] ? Number(head[2]) : null;
-      let end: number | null = head[3] ? Number(head[3]) : null;
+      let start: number | null = head[2] ? num(head[2]) : null;
+      let end: number | null = head[3] ? num(head[3]) : null;
       if (isNext) start = lastNumber + 1;
       if (start === null && !isSetup) throw new ReadError("Row number missing");
       if (end !== null && start !== null && end < start) throw new ReadError("Row range runs backwards");
@@ -636,8 +647,8 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
       const pre = readDeclared(bodyStripped);
       const rr = ROW_REPEAT_RE.exec(stripTrailing(pre.rest).s);
       if (rr) {
-        const from = Number(rr[1]);
-        const to = rr[2] ? Number(rr[2]) : from;
+        const from = num(rr[1]);
+        const to = rr[2] ? num(rr[2]) : from;
         const { declared } = pre;
         noteSizes(declared);
         const count = end !== null && start !== null ? end - start + 1 : 1;

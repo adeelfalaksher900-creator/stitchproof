@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CountingMachine } from "@/components/CountingMachine";
-import { Alert, Arrow, Check, Lock, Wand } from "@/components/icons";
+import { Alert, Arrow, Check, Lock } from "@/components/icons";
 import { REPO_URL } from "@/components/TopBar";
 import { SAMPLES } from "@/lib/samples";
 import { findErrata } from "@/lib/stitch/errata";
@@ -23,12 +23,11 @@ export default function Home() {
       {/* ---------- Hero ---------- */}
       <section className="mx-auto grid max-w-[1200px] items-center gap-12 px-4 pt-14 pb-16 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pt-24 lg:pb-24">
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold tracking-wide text-accent uppercase">For knitters &amp; pattern designers</p>
-          <h1 className="serif mt-4 text-[46px] leading-[0.98] text-ink sm:text-[68px] lg:text-[76px]">
-            Every row, <em className="text-accent">proven</em> before you cast on.
+          <h1 className="serif text-[46px] leading-[0.98] text-ink sm:text-[68px] lg:text-[76px]">
+            Every row, proven before you cast on.
           </h1>
           <p className="mt-6 max-w-[34rem] text-[17px] leading-relaxed text-ink-2 sm:text-[18px]">
-            Paste a knitting pattern. Stitchproof reads it, counts every stitch in every size, and shows you exactly where the numbers don&apos;t add up — with the fix.
+            Paste a knitting pattern. Stitchproof reads it, counts every stitch in every size, and shows you exactly where the numbers don&apos;t add up, and how to fix them.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/proof?sample=beanie&run=1" className="btn btn-primary btn-lg">
@@ -60,7 +59,7 @@ export default function Home() {
               </div>
               {e.fix && (
                 <div className="border-t border-line bg-surface-2 px-5 py-4">
-                  <p className="text-[12px] font-semibold tracking-wide text-accent uppercase">Suggested fix</p>
+                  <p className="text-[12.5px] font-semibold text-ink-2">Suggested fix</p>
                   <p className="mt-1 text-[14.5px] font-medium">{e.fix.description}</p>
                   <div className="mono mt-3 overflow-hidden rounded-xl border border-line bg-surface text-[12px] leading-6">
                     <div className="truncate px-3 text-ink-3"><span className="mr-2 text-bad">−</span>{e.fix.lineBefore}</div>
@@ -76,32 +75,14 @@ export default function Home() {
         )}
       </section>
 
-      {/* ---------- Facts ---------- */}
-      <section className="border-y border-line bg-surface">
-        <dl className="mx-auto grid max-w-[1200px] gap-px px-4 sm:grid-cols-3 sm:px-6">
-          {[
-            ["9 million", "registered knitters and crocheters on Ravelry alone", "Ravelry, 2020"],
-            ["$20–50 an hour", "what designers pay tech editors to re-count every row by hand", "Pattern Design Circle"],
-            ["0 guesses", "Stitchproof's counts come from code, never from a language model", "How it works ↓"],
-          ].map(([big, small, src]) => (
-            <div key={big} className="py-8 sm:px-6 sm:first:pl-0">
-              <dt className="text-[28px] font-semibold tracking-[-0.03em] tnum">{big}</dt>
-              <dd className="mt-1 text-[14px] leading-snug text-ink-2">{small}</dd>
-              <dd className="mt-2 text-[11.5px] text-ink-3">{src}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
       {/* ---------- How it works ---------- */}
-      <section id="how" className="mx-auto max-w-[1200px] px-4 py-20 sm:px-6 lg:py-28">
+      <section id="how" className="mx-auto max-w-[1200px] border-t border-line px-4 py-20 sm:px-6 lg:py-24">
         <div className="max-w-2xl">
-          <p className="text-[13px] font-semibold tracking-wide text-accent uppercase">How it works</p>
-          <h2 className="mt-3 text-[34px] leading-tight font-semibold tracking-[-0.03em] sm:text-[42px]">
+          <h2 className=" text-[34px] leading-tight font-semibold tracking-[-0.03em] sm:text-[42px]">
             AI reads the words. Code counts the stitches.
           </h2>
           <p className="mt-4 text-[16.5px] leading-relaxed text-ink-2">
-            Language models write pattern-shaped text without keeping a running total — that&apos;s why AI-generated patterns so often don&apos;t work. Stitchproof only trusts AI to translate. Every count is plain arithmetic you can check.
+            Language models write pattern-shaped text without keeping a running total. That&apos;s why AI-generated patterns so often don&apos;t work. Stitchproof only trusts AI to translate. Every count is plain arithmetic you can check.
           </p>
         </div>
         <div className="mt-12 grid items-start gap-10 lg:grid-cols-[1.4fr_1fr] lg:gap-14">
@@ -110,9 +91,9 @@ export default function Home() {
           </div>
           <ol className="space-y-8">
             {[
-              ["Read", "The offline reader understands standard notation. Only lines it can't read are sent to a small AI model, which rewrites them in strict notation — copying every number, never correcting it. The parser then checks that translation before anything is counted."],
+              ["Read", "The offline reader understands standard notation. Only lines it can't read are sent to a small AI model, which rewrites them in strict notation, copying every number, never correcting it. The parser then checks that translation before anything is counted."],
               ["Count", "Every stitch is defined by how many stitches it uses and how many it makes: k2tog uses 2 and makes 1, a yarn-over uses none and makes 1. Each row is walked stitch by stitch, for every size, and compared with the count the pattern promises."],
-              ["Fix", "When a row doesn't add up, Stitchproof tries small edits to that row's numbers, re-counts the whole pattern for each, and suggests the one that makes everything agree — or tells you the printed count is the typo."],
+              ["Fix", "When a row doesn't add up, Stitchproof tries small edits to that row's numbers, re-counts the whole pattern for each, and suggests the one that makes everything agree, or tells you the printed count is the typo."],
             ].map(([t, d], i) => (
               <li key={t} className="flex gap-4">
                 <span className="mono grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line-2 bg-surface text-[13px] font-semibold">{i + 1}</span>
@@ -130,20 +111,20 @@ export default function Home() {
       <Accuracy />
 
       {/* ---------- Who it's for ---------- */}
-      <section className="bg-paper-2/60 py-20 lg:py-24">
-        <div className="mx-auto grid max-w-[1200px] gap-5 px-4 sm:px-6 md:grid-cols-3">
+      <section className="mx-auto grid max-w-[1200px] gap-8 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_2fr] lg:gap-16 lg:py-24">
+        <h2 className="text-[30px] leading-tight font-semibold tracking-[-0.03em] sm:text-[36px]">Who it&apos;s for</h2>
+        <dl className="divide-y divide-line border-y border-line">
           {[
-            ["Designers", "Check every size before you publish, and catch the errata your test knitters would have found on row 40.", <Check key="1" size={18} strokeWidth={2.2} />],
-            ["Knitters", "Check a pattern before you buy yarn, and see each row in plain English with the count to expect.", <Wand key="2" size={18} />],
-            ["Buyers", "Patterns that never add up are a classic sign of AI-generated listings. Get evidence, not a hunch.", <Alert key="3" size={18} />],
-          ].map(([t, d, icon]) => (
-            <div key={t as string} className="card p-6">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent">{icon}</span>
-              <h3 className="mt-4 text-[17px] font-semibold tracking-[-0.015em]">{t}</h3>
-              <p className="mt-1.5 text-[14.5px] leading-relaxed text-ink-2">{d}</p>
+            ["Designers", "Check every size before you publish, and catch the errata your test knitters would have found on row 40. Send them a proof link instead of a spreadsheet."],
+            ["Knitters", "Check a pattern before you buy yarn, then knit it one row at a time with the count to expect and each row in plain English."],
+            ["Buyers", "A pattern whose numbers never add up is a common sign of a machine-written listing. Get evidence, not a hunch."],
+          ].map(([t, d]) => (
+            <div key={t} className="grid gap-1 py-5 sm:grid-cols-[9rem_1fr] sm:gap-6">
+              <dt className="text-[16px] font-semibold tracking-[-0.01em]">{t}</dt>
+              <dd className="text-[15px] leading-relaxed text-ink-2">{d}</dd>
             </div>
           ))}
-        </div>
+        </dl>
       </section>
 
       {/* ---------- CTA ---------- */}
@@ -151,7 +132,6 @@ export default function Home() {
         <h2 className="serif text-[44px] leading-none sm:text-[56px]">Knit it once. Knit it right.</h2>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/proof" className="btn btn-primary btn-lg">Proof a pattern <Arrow size={18} /></Link>
-          <Link href="/proof?sample=scarf&run=1" className="btn btn-secondary btn-lg">See the AI reader</Link>
         </div>
       </section>
 
@@ -181,11 +161,10 @@ function Accuracy() {
     <section className="border-y border-line bg-surface">
       <div className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 lg:py-20">
         <div className="max-w-2xl">
-          <p className="text-[13px] font-semibold tracking-wide text-accent uppercase">Measured, not claimed</p>
-          <h2 className="mt-3 text-[30px] leading-tight font-semibold tracking-[-0.03em] sm:text-[36px]">We broke correct patterns on purpose.</h2>
+          <h2 className=" text-[30px] leading-tight font-semibold tracking-[-0.03em] sm:text-[36px]">We broke correct patterns on purpose.</h2>
           <p className="mt-3 text-[15.5px] leading-relaxed text-ink-2">
-            Every number in six correct patterns — cast-ons, repeat counts, stitch counts and stated totals, in every size — was changed by ±1 and ±2, the
-            typos designers actually make. Then Stitchproof proofed and fixed each broken copy on its own.
+            Every number in six correct patterns (cast-ons, repeat counts, stitch counts and stated totals, in every size) was changed by ±1 and ±2,
+            the typos designers actually make. Then Stitchproof proofed and fixed each broken copy on its own.
           </p>
         </div>
         <dl className="mt-10 grid grid-cols-2 gap-x-4 gap-y-6 sm:gap-6 lg:grid-cols-4">

@@ -5,10 +5,10 @@ import { STITCHES } from "@/lib/stitch/stitches";
 import { Question } from "./icons";
 
 const EXAMPLES: [string, string][] = [
-  ["CO 80 (88, 96) sts.", "Cast on — one number per size"],
+  ["CO 80 (88, 96) sts.", "Cast on, one number per size"],
   ["Row 5 (RS): …   Rnd 3: …   Rows 3–12: …", "Rows, rounds and ranges"],
   ["Row 2 and all WS rows: Purl.", "A rule for every wrong-side row"],
-  ["K2, *p2, k2; rep from * to end.", "Star repeats — also “to last 3 sts”, “4 more times”, “around”"],
+  ["K2, *p2, k2; rep from * to end.", "Star repeats, also “to last 3 sts”, “4 more times”, “around”"],
   ["[K1, p1] 5 times.   (k1, p1) x 5", "Bracket repeats"],
   ["K to last st, m1r, k1.", "Whole and partial rows"],
   ["Rows 7–40: Rep rows 5–6.", "Repeating earlier rows"],
@@ -44,7 +44,7 @@ export function NotationGuide({ label = "What can I paste?" }: { label?: string 
                 What Stitchproof reads
               </h2>
               <p className="mt-1 text-[14px] text-ink-2">
-                Standard written US knitting notation is read instantly in your browser. Anything else — loose prose, unusual phrasing — goes to the AI
+                Standard written US knitting notation is read instantly in your browser. Anything else, like loose prose or unusual phrasing, goes to the AI
                 reader in Auto mode, and lines it can&apos;t express are marked “not counted”, never guessed.
               </p>
             </div>

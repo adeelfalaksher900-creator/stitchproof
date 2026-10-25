@@ -4,7 +4,7 @@
  */
 const PREFIX = "#p=";
 
-async function pipe(bytes: Uint8Array, stream: CompressionStream | DecompressionStream): Promise<Uint8Array> {
+async function pipe(bytes: Uint8Array, stream: CompressionStream): Promise<Uint8Array> {
   const out = new Response(new Blob([bytes as BlobPart]).stream().pipeThrough(stream));
   return new Uint8Array(await out.arrayBuffer());
 }
@@ -20,6 +20,26 @@ function fromBase64Url(s: string): Uint8Array {
   return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
 
+const MAX_CHARS = 20_000;
+
+/** Decompress, but stop early: a crafted link could otherwise expand to gigabytes and crash the tab. */
+async function inflateCapped(bytes: Uint8Array): Promise<string | null> {
+  const reader = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate-raw")).getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > MAX_CHARS * 4) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return size ? new TextDecoder().decode(await new Blob(chunks as BlobPart[]).arrayBuffer()) : null;
+}
+
 export async function shareUrl(text: string, origin = window.location.origin): Promise<string> {
   const packed = await pipe(new TextEncoder().encode(text), new CompressionStream("deflate-raw"));
   return `${origin}/proof${PREFIX}${toBase64Url(packed)}`;
@@ -29,9 +49,8 @@ export async function shareUrl(text: string, origin = window.location.origin): P
 export async function readShared(hash: string): Promise<string | null> {
   if (!hash.startsWith(PREFIX)) return null;
   try {
-    const bytes = await pipe(fromBase64Url(hash.slice(PREFIX.length)), new DecompressionStream("deflate-raw"));
-    const text = new TextDecoder().decode(bytes);
-    return text.length > 0 && text.length <= 20_000 ? text : null;
+    const text = await inflateCapped(fromBase64Url(hash.slice(PREFIX.length)));
+    return text && text.length <= MAX_CHARS ? text : null;
   } catch {
     return null;
   }

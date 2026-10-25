@@ -11,9 +11,9 @@
   --ink-3: #6e6a61;
   --line: #e6e2d9;
   --line-2: #d8d3c7;
-  --accent: #3e3bc9;
+  --accent: #1f5f5b;
   --accent-ink: #ffffff;
-  --accent-soft: #ecebfb;
+  --accent-soft: #e2edea;
   --ok: #2f7a4d;
   --ok-soft: #e6f2ea;
   --warn: #a86a12;
@@ -41,9 +41,9 @@
     --ink-3: #8b867b;
     --line: #2e2c27;
     --line-2: #3a3832;
-    --accent: #8c8af5;
+    --accent: #7fc3bb;
     --accent-ink: #12110f;
-    --accent-soft: #24234a;
+    --accent-soft: #15292a;
     --ok: #6cc08e;
     --ok-soft: #17291e;
     --warn: #e0a64a;
@@ -150,12 +150,12 @@ body {
   cursor: not-allowed;
 }
 .btn-primary {
-  background: var(--accent);
-  color: var(--accent-ink);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.15) inset, 0 1px 2px rgb(30 28 120 / 0.25);
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.12) inset, 0 1px 2px rgb(0 0 0 / 0.2);
 }
 .btn-primary:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--accent) 88%, black);
+  background: color-mix(in oklab, var(--ink) 86%, var(--paper));
 }
 .btn-secondary {
   background: var(--surface);

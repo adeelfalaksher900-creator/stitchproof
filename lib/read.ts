@@ -2,6 +2,19 @@ import { parsePattern } from "./stitch/parse";
 import { readsOffline } from "./stitch/proof";
 import type { Program } from "./stitch/types";
 
+/** A visitor's own Gemini key, kept only in this browser (see components/AiKey). */
+export const KEY_STORE = "stitchproof:gemini-key";
+export const KEY_RE = /^[\w-]{20,200}$/;
+
+export function savedKey(): string | null {
+  try {
+    const k = localStorage.getItem(KEY_STORE);
+    return k && KEY_RE.test(k) ? k : null;
+  } catch {
+    return null;
+  }
+}
+
 export type ReaderMode = "auto" | "offline";
 
 export interface Reading {
@@ -35,10 +48,11 @@ export async function readPattern(
     };
   }
   onStage?.("ai");
+  const key = savedKey();
   try {
     const res = await fetch("/api/read", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(key ? { "x-gemini-key": key } : {}) },
       body: JSON.stringify({ text }),
       signal,
     });

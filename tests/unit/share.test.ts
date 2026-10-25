@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { readShared, shareUrl } from "@/lib/share";
 import { SAMPLES } from "@/lib/samples";
 
@@ -13,4 +13,11 @@ it("round-trips a pattern through a share link and stays short", async () => {
 it("ignores broken or foreign fragments", async () => {
   expect(await readShared("#p=not-valid-data")).toBeNull();
   expect(await readShared("#something-else")).toBeNull();
+});
+
+describe("share link safety", () => {
+  it("rejects a link that would expand far beyond the pattern limit", async () => {
+    const bomb = await shareUrl("k".repeat(5_000_000), "https://x.test");
+    expect(await readShared(bomb.slice(bomb.indexOf("#")))).toBeNull();
+  });
 });

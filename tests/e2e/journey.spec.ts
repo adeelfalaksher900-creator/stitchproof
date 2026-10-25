@@ -94,3 +94,22 @@ test.describe("sharing and help", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 });
+
+test("a visitor's own AI key is saved in the browser and sent with AI readings", async ({ page }) => {
+  let sent: string | null = null;
+  await page.route("**/api/read", (r) => {
+    sent = r.request().headers()["x-gemini-key"] ?? null;
+    return r.fulfill({ status: 503, json: { error: "The AI reader couldn't use your key. Check it under “AI key”." } });
+  });
+  await page.goto("/proof");
+  await page.getByRole("button", { name: "AI key" }).click();
+  await page.getByLabel("Gemini API key").fill("short");
+  await page.getByRole("button", { name: "Save key" }).click();
+  await expect(page.getByText(/doesn't look like an API key/)).toBeVisible();
+  await page.getByLabel("Gemini API key").fill("AIzaTEST_key-0123456789abcdef");
+  await page.getByRole("button", { name: "Save key" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.goto("/proof?sample=scarf&run=1");
+  await expect(page.getByText(/couldn't use your key/)).toBeVisible();
+  expect(sent).toBe("AIzaTEST_key-0123456789abcdef");
+});

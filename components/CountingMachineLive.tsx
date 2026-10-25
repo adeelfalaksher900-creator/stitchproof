@@ -213,7 +213,7 @@ export function CountingMachineLive({ svg, P }: { svg: string; P: Projection }) 
         <span className="iso-caption">
           One round of a hat crown, <span className="mono">*K2, k2tog; rep from * once more</span>, set as type. Each slug is as wide as the stitches it
           uses and carries one pin per stitch it makes; every pin the feeler climbs turns the dial one division. The marker holds the count the pattern
-          states — here 6, then a typo&apos;d 7 — and the lamp shows whether the needle stops on it. Stitchproof&apos;s counter runs this same uses/makes
+          states (here 6, then a typo&apos;d 7), and the lamp shows whether the needle stops on it. Stitchproof&apos;s counter runs this same uses/makes
           table on every row of every size.
         </span>
       </figcaption>

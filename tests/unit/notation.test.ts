@@ -65,3 +65,14 @@ Rows 6–7: Rep rows 4–5.`);
     expect(proof.verdict).toBe("partial");
   });
 });
+
+describe("absurd input", () => {
+  it("refuses huge numbers and row counts instead of freezing", () => {
+    const t0 = performance.now();
+    expect(parsePattern("CO 10.\nRows 1-999999999: Knit.").unread[0].reason).toMatch(/too large/);
+    expect(parsePattern("CO 10.\nRow 1: [k1, yo] 99999999 times.").unread[0].reason).toMatch(/too large/);
+    const many = parsePattern("CO 10.\n" + "Rows 1-4000: Knit.\n".repeat(50));
+    expect(many.rows.length).toBeLessThanOrEqual(5000);
+    expect(performance.now() - t0).toBeLessThan(2000);
+  });
+});

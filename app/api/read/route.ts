@@ -1,4 +1,4 @@
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI, google } from "@ai-sdk/google";
 import { generateText, type LanguageModel } from "ai";
 import { z } from "zod";
 import { aiRead } from "@/lib/ai/reader";
@@ -18,11 +18,13 @@ interface Candidate {
  * Models to try, in order. A Gemini key (free tier) is used first when set;
  * otherwise Vercel AI Gateway, which authenticates with the deployment's OIDC token.
  */
-function candidates(): Candidate[] {
+function candidates(userKey: string | null): Candidate[] {
   const list: Candidate[] = [];
+  const geminiId = process.env.GEMINI_MODEL || "gemini-flash-latest";
+  // A visitor's own key (from the "AI key" box) goes first; it is used for this request only, never stored or logged.
+  if (userKey) list.push({ label: `google/${geminiId}`, model: createGoogleGenerativeAI({ apiKey: userKey })(geminiId) });
   if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    const id = process.env.GEMINI_MODEL || "gemini-flash-latest";
-    list.push({ label: `google/${id}`, model: google(id) });
+    list.push({ label: `google/${geminiId}`, model: google(geminiId) });
   }
   if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL) {
     const ids = [process.env.STITCHPROOF_MODEL, "anthropic/claude-haiku-5.5", "anthropic/claude-haiku-4.5"];
@@ -64,7 +66,9 @@ export async function POST(req: Request) {
     return Response.json({ error: parsed.error.issues[0]?.message ?? "Invalid request." }, { status: 400 });
   }
 
-  const models = candidates();
+  const header = req.headers.get("x-gemini-key")?.trim() ?? "";
+  const userKey = /^[\w-]{20,200}$/.test(header) ? header : null;
+  const models = candidates(userKey);
   if (models.length === 0) {
     return Response.json({ error: "The AI reader isn't configured here." }, { status: 503 });
   }
@@ -89,5 +93,6 @@ export async function POST(req: Request) {
       console.error(`[read] ${label} failed:`, lastError.slice(0, 300));
     }
   }
-  return Response.json({ error: "The AI reader is unavailable right now." }, { status: 503 });
+  const error = userKey ? "The AI reader couldn't use your key. Check it under “AI key”." : "The AI reader is unavailable right now.";
+  return Response.json({ error }, { status: 503 });
 }

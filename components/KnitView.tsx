@@ -128,7 +128,7 @@ export function KnitView({ id }: { id: string }) {
         ) : (
           <article key={`${safeRow}-${safeSize}`} className="card rise overflow-hidden" aria-live="polite">
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-4 sm:px-8">
-              <span className="text-[13px] font-semibold tracking-wide text-accent uppercase">{current.label}</span>
+              <span className="text-[14px] font-semibold text-ink-2">{current.label}</span>
               {current.side && <span className="pill bg-paper-2 text-ink-2">{current.side === "RS" ? "Right side" : "Wrong side"}</span>}
               <span className="ml-auto text-[12.5px] text-ink-3 tnum">
                 {current.number !== null ? `${countedSoFar} of ${counted}` : "Setup"}
