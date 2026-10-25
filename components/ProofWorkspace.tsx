@@ -9,8 +9,9 @@ import { findErrata, type Erratum } from "@/lib/stitch/errata";
 import { findFixes } from "@/lib/stitch/fixes";
 import { proofProgram, type Proof } from "@/lib/stitch/proof";
 import { readShared, shareUrl } from "@/lib/share";
+import { proofReport } from "@/lib/report";
 import { load, newId, save, titleOf } from "@/lib/store";
-import { Alert, Arrow, Check, Link2, Lock, Needles, Question, Wand } from "./icons";
+import { Alert, Arrow, Check, Doc, Link2, Lock, Needles, Question, Wand } from "./icons";
 import { NotationGuide } from "./NotationGuide";
 import { AiKey } from "./AiKey";
 import { PatternEditor, type EditorHandle, type LineMark } from "./PatternEditor";
@@ -314,6 +315,25 @@ export function ProofWorkspace() {
                     setError("Couldn't copy the link. Your browser may block clipboard access on this page.");
                   }
                 }}
+                onReport={async () => {
+                  try {
+                    const link = await shareUrl(reading.readBy === "ai" ? reading.readingText : proofedText);
+                    const rows = proof.program.rows;
+                    await navigator.clipboard.writeText(
+                      proofReport({
+                        title: proof.program.title ?? titleOf(proofedText),
+                        counted: rows.filter((r) => r.number !== null).length,
+                        rowsWord: rows.some((r) => r.round) ? "rounds" : "rows",
+                        sizes: proof.program.sizes,
+                        errata: errata?.list ?? [],
+                        link,
+                      }),
+                    );
+                    setNotice("Report copied. Paste it into a message to the seller, a marketplace report or your test knitters. It links to this proof.");
+                  } catch {
+                    setError("Couldn't copy the report. Your browser may block clipboard access on this page.");
+                  }
+                }}
                 patternId={patternId}
                 onSelect={setSelectedKey}
                 selectedKey={selectedKey}
@@ -439,7 +459,7 @@ function EmptyState({ onSample }: { onSample: (id: string) => void }) {
 }
 
 function Summary({
-  proof, reading, sizeIndex, setSizeIndex, elapsed, errata, onApplyAll, onShare, patternId, onSelect, selectedKey,
+  proof, reading, sizeIndex, setSizeIndex, elapsed, errata, onApplyAll, onShare, onReport, patternId, onSelect, selectedKey,
 }: {
   proof: Proof;
   reading: Reading;
@@ -449,6 +469,7 @@ function Summary({
   errata: { list: Erratum[]; fixedText: string | null } | null;
   onApplyAll: () => void;
   onShare: () => void;
+  onReport: () => void;
   patternId: string | null;
   onSelect: (k: string | null) => void;
   selectedKey: string | null;
@@ -528,6 +549,11 @@ function Summary({
             {verdict !== "empty" && (
               <button type="button" className="btn btn-ghost" onClick={onShare} title="Copy a private link with this pattern inside it">
                 <Link2 size={16} /> Share proof
+              </button>
+            )}
+            {verdict === "issues" && errata && (
+              <button type="button" className="btn btn-ghost" onClick={onReport} title="Copy a plain-text summary of the errata, with a link to this proof">
+                <Doc size={16} /> Copy report
               </button>
             )}
           </div>

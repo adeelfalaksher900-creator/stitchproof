@@ -75,8 +75,36 @@ export default function Home() {
         )}
       </section>
 
+      {/* ---------- Why now ---------- */}
+      <section className="border-t border-line bg-surface">
+        <div className="mx-auto grid max-w-[1200px] gap-8 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_1.15fr] lg:gap-16 lg:py-20">
+          <div>
+            <p className="mono text-[12.5px] text-ink-3">October 22, 2026</p>
+            <h2 className="mt-2 text-[30px] leading-tight font-semibold tracking-[-0.03em] sm:text-[36px]">
+              Etsy banned AI-written patterns. Buyers still can&apos;t tell which ones they are.
+            </h2>
+          </div>
+          <div className="space-y-4 text-[16px] leading-relaxed text-ink-2">
+            <p>
+              Etsy now prohibits AI-generated knitting, crochet and other craft patterns, after admitting that many buyers
+              &ldquo;can&apos;t tell which items involve AI-generated content.&rdquo; A knitwear designer told CBC her sales had halved since
+              those patterns appeared.
+            </p>
+            <p>
+              A rule needs evidence. A pattern whose stitch counts cannot work is evidence anyone can check, and Stitchproof finds it in
+              seconds: which row, which size, by how many stitches. Designers get the same check before they publish.
+            </p>
+            <ul className="flex flex-wrap gap-x-5 gap-y-1 pt-1 text-[13px]">
+              <li><a className="text-accent underline-offset-2 hover:underline" href="https://www.cnbc.com/2026/10/22/etsy-bans-ai-generated-recipes-patterns-from-its-online-marketplace.html" target="_blank" rel="noreferrer">CNBC, Oct 22 2026</a></li>
+              <li><a className="text-accent underline-offset-2 hover:underline" href="https://www.cbc.ca/news/canada/calgary/ai-etsy-knitting-crochet-crafting-9.7351609" target="_blank" rel="noreferrer">CBC News</a></li>
+              <li><a className="text-accent underline-offset-2 hover:underline" href="https://www.etsy.com/news/creativity-and-trust-in-the-age-of-ai" target="_blank" rel="noreferrer">Etsy announcement</a></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       {/* ---------- How it works ---------- */}
-      <section id="how" className="mx-auto max-w-[1200px] border-t border-line px-4 py-20 sm:px-6 lg:py-24">
+      <section id="how" className="mx-auto max-w-[1200px] px-4 py-20 sm:px-6 lg:py-24">
         <div className="max-w-2xl">
           <h2 className=" text-[34px] leading-tight font-semibold tracking-[-0.03em] sm:text-[42px]">
             AI reads the words. Code counts the stitches.
@@ -117,7 +145,7 @@ export default function Home() {
           {[
             ["Designers", "Check every size before you publish, and catch the errata your test knitters would have found on row 40. Send them a proof link instead of a spreadsheet."],
             ["Knitters", "Check a pattern before you buy yarn, then knit it one row at a time with the count to expect and each row in plain English."],
-            ["Buyers", "A pattern whose numbers never add up is a common sign of a machine-written listing. Get evidence, not a hunch."],
+            ["Buyers", "Check a pattern before you pay for yarn. If the numbers can\u2019t work, copy a plain-text report with the exact rows and send it to the seller or the marketplace."],
           ].map(([t, d]) => (
             <div key={t} className="grid gap-1 py-5 sm:grid-cols-[9rem_1fr] sm:gap-6">
               <dt className="text-[16px] font-semibold tracking-[-0.01em]">{t}</dt>

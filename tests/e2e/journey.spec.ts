@@ -78,6 +78,11 @@ test.describe("sharing and help", () => {
     await expect(page.getByText(/Share link copied/)).toBeVisible();
     const url = await page.evaluate(() => navigator.clipboard.readText());
     expect(url).toContain("/proof#p=");
+    await page.getByRole("button", { name: /Copy report/ }).click();
+    await expect(page.getByText(/Report copied/)).toBeVisible();
+    const report = await page.evaluate(() => navigator.clipboard.readText());
+    expect(report).toContain("Result: 3 places where the stitch counts don't add up.");
+    expect(report).toContain("/proof#p=");
     const fresh = await browser.newContext();
     const other = await fresh.newPage();
     await other.goto(url);

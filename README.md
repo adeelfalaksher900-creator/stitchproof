@@ -16,7 +16,8 @@
 Every written knitting pattern makes a promise: *follow these instructions and you'll have exactly this many stitches.* Breaking that promise is expensive — you find out forty rows later and rip everything out.
 
 - **Errata are everywhere.** Designers re-count every row of every size by hand, or pay a tech editor (typically $20–50/hour) to do it, and mistakes still ship.
-- **AI-generated patterns made it worse.** Marketplaces are filling with patterns written by language models, which produce pattern-shaped text without keeping a running stitch total. Newer knitters often blame themselves when these don't work.
+- **AI-generated patterns made it worse.** Marketplaces filled with patterns written by language models, which produce pattern-shaped text without keeping a running stitch total. On October 22, 2026 Etsy banned AI-generated craft patterns ([CNBC](https://www.cnbc.com/2026/10/22/etsy-bans-ai-generated-recipes-patterns-from-its-online-marketplace.html)), noting that many buyers can't tell which items involve AI; a knitwear designer told [CBC](https://www.cbc.ca/news/canada/calgary/ai-etsy-knitting-crochet-crafting-9.7351609) her sales had halved. A ban needs evidence, and a pattern whose counts can't work is evidence anyone can check.
+- **Even careful shops ship count errors.** Purl Soho's free Classic Ribbed Hat once said 18 stitches remained where the arithmetic left 12; a knitter found it after working the crown, and the pattern was corrected ([comment thread, 2019](https://www.purlsoho.com/create/2019/01/30/classic-ribbed-hat/#comment-177658)).
 
 Stitchproof checks the arithmetic for you — without trusting a language model to do it.
 
@@ -29,6 +30,7 @@ Stitchproof checks the arithmetic for you — without trusting a language model 
 | **Suggested fixes** | For each erratum, Stitchproof tries small edits, re-counts the whole pattern for each, and proposes the one that makes everything agree, with its evidence. One click applies it. |
 | **Shape preview** | The piece's silhouette, row by row, for the selected size. |
 | **Plain English** | Any row expands into words, with the repeat counts worked out ("repeat [purl 2, knit 2] until 5 stitches remain — that's 9 times"). |
+| **Copy report** | A plain-text summary of every erratum (row, size, what's wrong, likely fix) with a link to the full proof, for a message to the seller, a marketplace report or test knitters. |
 | **Knit mode** | One row at a time, with the count to expect. Your place is saved in the browser. |
 | **Share links** | "Share proof" copies a link with the whole pattern compressed into the URL fragment, so a designer can send a proof to test knitters — nothing is uploaded or stored. |
 | **Notation guide** | "What can I paste?" lists exactly what the offline reader understands and what it marks *can't verify*. |
@@ -57,7 +59,7 @@ flowchart LR
 
 **1. Read.** The offline reader (`lib/stitch/parse.ts`) turns standard notation — `CO 80 (88, 96) sts`, `*K2, p2; rep from * to last 3 sts, k3`, `Rows 3–12: Rep rows 1–2`, `(72 (81, 90) sts)` — into a *stitch program*. It records the character span of every number so fixes can edit the original text. Lines it can't read are reported, never guessed.
 
-**2. Translate (only if needed).** If any line can't be read, the text goes to `/api/read`, which asks a small model (default `anthropic/claude-haiku-5.5` via Vercel AI Gateway) to rewrite the pattern in strict notation. The model is told to copy every number exactly — even wrong ones — so mistakes survive to be found. The output is parsed by the same offline reader; if it fails, the model is asked once more with the parser's exact errors. Anything it can't express is marked `UNSURE` and shown as "not counted".
+**2. Translate (only if needed).** If any line can't be read, the text goes to `/api/read`, which asks a small model (Google `gemini-flash-lite-latest` with reasoning off, then `gemini-flash-latest`) to rewrite the pattern in strict notation. The model is told to copy every number exactly — even wrong ones — so mistakes survive to be found. The output is parsed by the same offline reader; if it fails, the model is asked once more with the parser's exact errors. Anything it can't express is marked `UNSURE` and shown as "not counted".
 
 **3. Count.** Every stitch is defined by how many stitches it **uses** and how many it **makes** (`k2tog` uses 2, makes 1; `yo` uses 0, makes 1). The counter (`lib/stitch/simulate.ts`) walks each row for each size, solves "to end" repeats as `(available − used − leave) ÷ stitches per repeat`, and flags rows where a repeat doesn't fit, stitches run out or are left unworked, or the result disagrees with the stated count.
 
@@ -76,7 +78,7 @@ flowchart TB
   end
   subgraph Vercel
     API[/api/read<br/>Zod validation · rate limit · timeout/]
-    GW[Vercel AI Gateway<br/>OIDC auth, no stored key]
+    GW[Google Gemini<br/>server key, or the visitor's own key]
   end
   UI -- only unreadable patterns --> API --> GW
   API -- strict notation --> UI
@@ -84,7 +86,7 @@ flowchart TB
 
 - **No accounts, no database.** Patterns and your place in them stay in your browser.
 - **Privacy:** standard patterns never leave the browser. *Offline* mode guarantees no network call for reading.
-- **Security:** request size limit (20,000 chars), Zod validation, per-instance rate limit, 40 s model timeout, security headers, no secrets in the client. On Vercel, AI Gateway authenticates with the deployment's OIDC token, so no API key is stored anywhere.
+- **Security:** request size limit (20,000 chars), Zod validation, per-instance rate limit, 25 s per model call and 52 s per request, security headers and a same-origin Content-Security-Policy, no secrets in the client. The site's Gemini key is a Vercel sensitive environment variable; a visitor's own key stays in their browser and is used for one request at a time, never stored or logged.
 
 ## Tech stack
 
@@ -122,8 +124,8 @@ npm run dev          # http://localhost:3000
 
 The offline reader, counter, fixer and Knit mode work with no configuration. To use the AI reader, copy `.env.example` to `.env.local` and set **one** of:
 
-- `GOOGLE_GENERATIVE_AI_API_KEY` — a free Google Gemini key (default model `gemini-flash-latest`, override with `GEMINI_MODEL`), or
-- `AI_GATEWAY_API_KEY` — a Vercel AI Gateway key (on Vercel, the deployment's OIDC token is used automatically).
+- `GOOGLE_GENERATIVE_AI_API_KEY` — a free Google Gemini key (default models `gemini-flash-lite-latest` then `gemini-flash-latest`; override with `GEMINI_MODEL`), or
+- `AI_GATEWAY_API_KEY` or `STITCHPROOF_MODEL` — turns on Vercel AI Gateway as a further fallback.
 
 ## Accuracy
 
@@ -148,7 +150,7 @@ BASE_URL=https://stitchproof-alpha.vercel.app npx playwright test   # against pr
 
 ## Deploy
 
-Import the repository into Vercel (framework: Next.js). For the AI reader, visitors can paste their own Gemini key under **AI key** on the Proof page (kept only in their browser, sent only with AI readings, never stored or logged by the server). To turn it on for everyone, add `GOOGLE_GENERATIVE_AI_API_KEY`, or enable AI Gateway on the team (its OIDC token is picked up automatically; optionally set `STITCHPROOF_MODEL`).
+Import the repository into Vercel (framework: Next.js) and add `GOOGLE_GENERATIVE_AI_API_KEY` as a sensitive environment variable. Visitors can also paste their own Gemini key under **AI key** on the Proof page (kept only in their browser, sent only with AI readings, never stored or logged by the server).
 
 ## Notation it reads offline
 
@@ -169,7 +171,8 @@ Import the repository into Vercel (framework: Next.js). For the AI reader, visit
 
 - Knitting only (crochet's turning-chain conventions need their own rules).
 - Text only — no charts, photos or PDFs.
-- Row counts that differ by size ("Rnds 13–40 (13–46, 13–52)") aren't supported yet.
+- Row counts that differ by size ("Rnds 13–40 (13–46, 13–52)", "repeat – (0, 1, 2) more times") aren't supported yet.
+- Working "to 2 stitches before next marker" is marked *can't verify*. Many published patterns place markers, so they are only partly verified today; marker-aware counting is next.
 - The rate limit is per server instance (best effort).
 
 ## Built with AI — disclosure
