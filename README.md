@@ -183,9 +183,14 @@ Import the repository into Vercel (framework: Next.js) and add `GOOGLE_GENERATIV
 - Not yet tested by knitters outside the team. If you try it on a real pattern, please [open an issue](https://github.com/adeelfalaksher900-creator/stitchproof/issues) with what it got wrong.
 - The rate limit is per server instance (best effort).
 
+## Team
+
+- **Adeel Falak Sher** — product lead: problem, scope, direction and review of each build step, testing, deployment.
+- **Raouf Khalid** — research and testing: how published patterns are written, sample and Knit-mode testing, write-up review.
+
 ## Built with AI — disclosure
 
-This project was planned and built with an AI coding agent (Claude) using the Devpost Learn Skill Pack, per the hackathon's rules. The planning documents in `devpost/` record which decisions were delegated. No pre-existing project code was used.
+This project was planned and built with an AI coding agent (Claude) using the Devpost Learn Skill Pack, per the hackathon's rules: Claude wrote the code and drafted the planning documents, demo video and write-up under the team's direction. The planning documents in `devpost/` record which decisions were delegated. No pre-existing project code was used.
 
 ## Third-party code
 

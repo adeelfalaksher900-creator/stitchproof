@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { findErrata } from "@/lib/stitch/errata";
 import { explainRow } from "@/lib/stitch/explain";
 import { parsePattern } from "@/lib/stitch/parse";
 import { proofText } from "@/lib/stitch/proof";
@@ -144,10 +145,15 @@ Rep last 2 rnds 8 (9, 10) more times. (16 sts)`;
     expect(p.verdict).toBe("partial");
   });
 
-  it("catches a repeat count that's wrong for one size", () => {
-    const p = proofText(hat.replace("8 (9, 10) more times", "8 (8, 10) more times"));
+  it("catches a repeat count that's wrong for one size, and fixes it", () => {
+    const broken = hat.replace("8 (9, 10) more times", "8 (8, 10) more times");
+    const p = proofText(broken);
     expect(p.sizes[1].issues).toBeGreaterThan(0);
     expect(p.sizes[0].issues + p.sizes[2].issues).toBe(0);
+    const { errata, fixedText } = findErrata(broken, p);
+    expect(errata).toHaveLength(1);
+    expect(errata[0].fix?.description).toBe("Change 8 to 9 in the repeat count (size Medium only).");
+    expect(fixedText).toBe(hat);
   });
 
   it("repeats rows until a stated count remains", () => {

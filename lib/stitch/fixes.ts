@@ -26,6 +26,8 @@ interface Candidate {
   ref: SizedRef;
   role: "instruction" | "declared";
   rowIndex: number;
+  /** Where the number sits, when that isn't the row's own instructions. */
+  label?: string;
 }
 
 function refsOf(ops: Op[], out: SizedRef[] = []): SizedRef[] {
@@ -84,7 +86,8 @@ export function findFixes(text: string, program: Program, rowKey: string, size: 
     if (seenLines.has(r.line) && idx !== rowIndex) continue;
     seenLines.add(r.line);
     for (const ref of refsOf(r.ops)) candidates.push({ ref, role: "instruction", rowIndex: idx });
-    if (r.until?.count.spans?.some(Boolean)) candidates.push({ ref: r.until.count, role: "instruction", rowIndex: idx });
+    if (r.until?.count.spans?.some(Boolean)) candidates.push({ ref: r.until.count, role: "instruction", rowIndex: idx, label: "the stitch count to repeat until" });
+    if (r.repeatRef?.spans?.some(Boolean)) candidates.push({ ref: r.repeatRef, role: "instruction", rowIndex: idx, label: "the repeat count" });
   }
   if (row.declared?.spans?.some(Boolean)) candidates.push({ ref: row.declared, role: "declared", rowIndex });
 
@@ -100,11 +103,11 @@ export function findFixes(text: string, program: Program, rowKey: string, size: 
     if (score >= baseline) return;
     // The row itself must be clean in this size after the edit.
     const after = simulate(p, size).rows[rowIndex];
-    if (!after || after.status !== "ok") return;
+    if (!after || (after.status !== "ok" && after.status !== "skipped")) return;
     const editLine = program.rows[cand.rowIndex].line;
     const target = program.rows[cand.rowIndex];
     const sizeName = program.sizes[size];
-    const where = `${target.label}${nSizes > 1 ? (scope === "size" ? ` (size ${sizeName} only)` : " (all sizes)") : ""}`;
+    const where = `${cand.label ?? target.label}${nSizes > 1 ? (scope === "size" ? ` (size ${sizeName} only)` : " (all sizes)") : ""}`;
     const description =
       cand.role === "declared"
         ? `Change the stated count in ${target.label} from ${oldWritten} to ${written}${nSizes > 1 ? ` for size ${sizeName}` : ""}.`

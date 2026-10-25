@@ -554,7 +554,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
 
   const copyRows = (
     from: number, to: number, startNumber: number, count: number, line: number, source: string,
-    declared?: SizedRef, onlyAt?: (i: number) => boolean[] | undefined,
+    declared?: SizedRef, onlyAt?: (i: number) => boolean[] | undefined, repeatRef?: SizedRef,
   ) => {
     const cycle: Row[] = [];
     for (let n = from; n <= to; n++) {
@@ -578,6 +578,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         source,
         copyOf: src.key,
         only: both(src.only, onlyAt?.(i) ?? null),
+        repeatRef,
       });
     }
   };
@@ -704,7 +705,9 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         continue;
       }
       if (lastM || fromM) {
-        const spec = readRepeatSpec({ s: (lastM ? lastM[3] : fromM![4]), at: 0 });
+        const tail = lastM ? lastM[3] : fromM![4];
+        const stripped = stripTrailing(repLine.rest);
+        const spec = readRepeatSpec({ s: tail, at: stripped.at + stripped.s.lastIndexOf(tail) });
         if (!spec || spec.kind !== "times") throw new ReadError("Couldn't read how many times to repeat");
         const { from, to } = blockOf();
         noteSizes(repLine.declared);
@@ -714,7 +717,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         const total = Math.max(...counts) * len;
         // Each size repeats the block its own number of times; extra copies are skipped for smaller sizes.
         const onlyAt = counts.length > 1 ? (i: number) => counts.map((c) => Math.floor(i / len) < c) : undefined;
-        copyRows(from, to, lastNumber + 1, total, li, line.s, repLine.declared, onlyAt);
+        copyRows(from, to, lastNumber + 1, total, li, line.s, repLine.declared, onlyAt, spec.ref);
         continue;
       }
 

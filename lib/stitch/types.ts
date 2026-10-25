@@ -62,6 +62,8 @@ export interface Row {
   only?: boolean[];
   /** "Rep last 2 rnds until 16 sts rem": these rows, repeated until the count is reached. */
   until?: { count: SizedRef; cycle: Row[] };
+  /** For copies made by "Rep last 2 rows 3 (4, 5) more times": that repeat count, so the fixer can edit it. */
+  repeatRef?: SizedRef;
 }
 
 export interface Unread {
