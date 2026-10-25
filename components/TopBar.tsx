@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Github, Logo } from "./icons";
+import { Code, Logo } from "./icons";
 
 export const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/adeelfalaksher900-creator/stitchproof";
 
@@ -53,7 +53,7 @@ export function TopBar() {
             className="btn btn-ghost btn-sm hidden sm:inline-flex"
             aria-label="Source code on GitHub"
           >
-            <Github size={16} />
+            <Code size={16} />
             <span>Source</span>
           </a>
         </div>

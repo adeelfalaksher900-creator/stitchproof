@@ -309,3 +309,63 @@ Cut yarn and thread tail through remaining stitches.`;
     expect(errata[0].fix?.description).toBe("Change 4 to 3 in the repeat count (size Large only).");
   });
 });
+
+describe("stated counts with a dash for sizes that skip the row", () => {
+  // As an AI reading of a chatbot-written beanie came out: the last rounds apply to the larger sizes only.
+  const hat = `Sizes: Child (Adult S, Adult L)
+CO 32 (40, 48) sts. Join to work in the rnd.
+Rnd 1: *K4 (5, 6), pm; rep from * around.
+Rnd 2: *K to 2 sts before m, k2tog, sm; rep from * around. (24 (32, 40) sts)
+Rnd 3: *K to 2 sts before m, k2tog, sm; rep from * around. (16 (24, 32) sts)
+Adult S & Adult L sizes only:
+Rnd 4: *K to 2 sts before m, k2tog, sm; rep from * around. (– (16, 24) sts)
+Adult L sizes only:
+Rnd 5: *K to 2 sts before m, k2tog, sm; rep from * around. (– (–, 16) sts)`;
+
+  it("doesn't read the dash as zero stitches", () => {
+    const p = proofText(hat);
+    expect(p.program.unread).toEqual([]);
+    expect(p.issueCount).toBe(0);
+    expect(p.sizes.map((s) => s.finalCount)).toEqual([16, 16, 16]);
+  });
+
+  it("still catches a wrong count in a size that works the row", () => {
+    expect(proofText(hat.replace("(– (–, 16) sts)", "(– (–, 12) sts)")).issueCount).toBe(1);
+  });
+});
+
+describe("a hat pattern a chatbot wrote (Gemini Flash-Lite, as the AI reader should translate it)", () => {
+  const hat = `Sizes: Baby (Child, Adult)
+CO 72 (84, 96) sts. Join to work in the rnd.
+Rnd 1: *K2, p2; rep from * around.
+Rnd 2: *[K2, p2] 3 (3.5, 4) times, pm; rep from * 5 more times.
+Rnd 3: *K2tog, work in rib to 2 sts before m, k2tog, sm; rep from * around. [12 sts decreased] (60 (72, 84) sts)
+Rnd 4: Work all stitches in established rib pattern. (60 (72, 84) sts)
+Rnd 5: Rep rnd 3. (48 (60, 72) sts) [12 sts decreased]
+Rnd 6: *K2tog, k2tog; rep from * around. [12 sts decreased] (24 (30, 36) sts)`;
+
+  it("says a repeat can't be worked 3.5 times", () => {
+    const p = proofText(hat);
+    expect(p.program.unread).toEqual([]);
+    const child = p.sizes[1].rows.find((r) => r.status === "issue")!;
+    expect(child.messages[0].text).toBe("This says to repeat 3.5 times, but a repeat can't be worked part of the way.");
+    // The half repeat is still counted as the 2 stitches it points at, so later rounds stay checkable.
+    expect(p.sizes[1].rows[p.sizes[1].rows.length - 2].after).toBe(60);
+  });
+
+  it("checks a stated decrease whether it comes before or after the count", () => {
+    const p = proofText(hat);
+    const last = (s: number) => p.sizes[s].rows[p.sizes[s].rows.length - 1];
+    expect(last(0).messages.map((m) => m.text)).toEqual(["This row decreases by 24; the pattern says it decreases by 12."]);
+    expect(p.sizes[0].rows[4].status).toBe("ok");
+  });
+});
+
+describe("the AI reader's worked example", () => {
+  it("is notation the offline reader accepts", async () => {
+    const { SYSTEM_PROMPT } = await import("@/lib/ai/prompt");
+    const output = SYSTEM_PROMPT.split("EXAMPLE 2")[1].split("Output:\n")[1];
+    const p = parsePattern(`Sizes: Baby (Child)\nCO 24 (28) sts. Join to work in the rnd.\nRnd 1: Knit.\n${output}`);
+    expect(p.unread).toEqual([]);
+  });
+});

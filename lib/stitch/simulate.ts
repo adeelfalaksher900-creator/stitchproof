@@ -208,7 +208,16 @@ function walk(ops: Op[], size: number, before: number, w: Walk) {
       }
       case "rep": {
         const times = at(op.times, size);
-        for (let i = 0; i < times; i++) walk(op.body, size, before, w);
+        const whole = Math.floor(times);
+        for (let i = 0; i < whole; i++) walk(op.body, size, before, w);
+        if (times !== whole) {
+          const text = `This says to repeat ${times} times, but a repeat can't be worked part of the way.`;
+          if (!w.messages.some((m) => m.text === text)) w.messages.push({ kind: "repeat-uneven", text });
+          // Count the part the number points at (3.5 × "k2, p2" = 14 sts), so later rows can still be checked.
+          const cost = fixedCost(op.body, size);
+          const part = cost && cost.uses === cost.makes ? (times - whole) * cost.uses : NaN;
+          if (Number.isInteger(part)) work(w, 1, 1, part);
+        }
         break;
       }
       case "repEnd": {

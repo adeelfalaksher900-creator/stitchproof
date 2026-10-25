@@ -51,7 +51,8 @@ function stripTrailing(src: Slice): Slice {
 }
 
 // A dash in a size group ("– (0, 1, 2)") means "not in this size": zero.
-const SIZED_RE = /^(\d+|[–—-](?=\s*\())(?:\s*\(\s*((?:\d+|[–—-])(?:\s*,\s*(?:\d+|[–—-]))*)\s*\)|((?:\s*\/\s*\d+)+))?/;
+// Decimals are read too ("3 (3.5, 4) times"), so the counter can say they can't be knitted.
+const SIZED_RE = /^(\d+(?:\.\d+)?|[–—-](?=\s*\())(?:\s*\(\s*((?:\d+(?:\.\d+)?|[–—-])(?:\s*,\s*(?:\d+(?:\.\d+)?|[–—-]))*)\s*\)|((?:\s*\/\s*\d+)+))?/;
 
 /** Read a sized number ("72", "72 (81, 90)", "72/81/90", "– (1, 2)") at the start of a slice. */
 function readSized(src: Slice): { ref: SizedRef; length: number } | null {
@@ -65,7 +66,7 @@ function readSized(src: Slice): { ref: SizedRef; length: number } | null {
   if (rest) {
     // Find each further number with its exact offset.
     const restStart = m[0].indexOf(rest, m[1].length);
-    const numRe = /\d+|[–—-]/g;
+    const numRe = /\d+(?:\.\d+)?|[–—-]/g;
     let nm: RegExpExecArray | null;
     while ((nm = numRe.exec(rest))) {
       if (/^\d/.test(nm[0])) {
@@ -250,11 +251,11 @@ function readItem(src: Slice): Op {
     return { t: "toEnd", code, leave: zero() };
   }
   // "Work in established pattern", "work even", "cont in rib as set": the count carries over.
-  if (/^(?:work|cont(?:inue)?)\s+(?:even|as (?:established|set)|(?:even\s+)?in\s+(?:the\s+)?(?:established\s+)?(?:patt(?:ern)?|rib(?:bing)?|st(?:itch)? patt(?:ern)?)(?:\s+as\s+(?:established|set))?)(?:\s+(?:to end|across|around))?$/.test(lower)) {
+  if (/^(?:work|cont(?:inue)?)\s+(?:all\s+(?:sts|stitches)\s+)?(?:even|as (?:established|set)|(?:even\s+)?in\s+(?:the\s+)?(?:established\s+)?(?:\d+x\d+\s+)?(?:rib\s+)?(?:patt(?:ern)?|rib(?:bing)?|st(?:itch)? patt(?:ern)?)(?:\s+as\s+(?:established|set))?)(?:\s+(?:to end|across|around))?$/.test(lower)) {
     return { t: "toEnd", code: "patt", leave: zero() };
   }
   // "work in pattern to 2 stitches before next marker"
-  const pattTo = /^(?:work|cont(?:inue)?) in (?:the )?(?:established )?(?:patt(?:ern)?|rib(?:bing)?) (to\s.*)$/.exec(lower);
+  const pattTo = /^(?:work|cont(?:inue)?) in (?:the )?(?:established )?(?:rib )?(?:patt(?:ern)?|rib(?:bing)?) (to\s.*)$/.exec(lower);
   if (pattTo) {
     const leave = readMarkerSpec(slice(t, lower.length - pattTo[1].length));
     if (leave) return { t: "toMarker", code: "patt", leave };
@@ -449,6 +450,9 @@ function topLevelIndex(s: string, ch: string): number {
  * Pull a declared stitch count off the end of a row body:
  * "(72 sts)", "(72 (81, 90) sts)", "— 72 sts", "[72 sts rem]", ": 72 sts".
  */
+// In a stated count, a dash means "this size doesn't say" ("– (8, 16) sts"), not zero stitches.
+const dashUnstated = (ref: SizedRef): SizedRef => ({ ...ref, values: ref.values.map((v, i) => (ref.spans?.[i] ? v : Number.NaN)) });
+
 function readDeclared(body: Slice): { rest: Slice; declared?: SizedRef; change?: StitchChange } {
   const t = stripTrailing(trim(body));
   const s = t.s;
@@ -461,7 +465,9 @@ function readDeclared(body: Slice): { rest: Slice; declared?: SizedRef; change?:
     const numAt = change.index + change[0].indexOf(change[1]);
     const num = readSized(slice(t, numAt));
     if (num && num.length === change[1].trim().length) {
-      return { rest: stripTrailing(slice(t, 0, change.index)), change: { ref: num.ref, sign: /^dec/i.test(change[2]) ? -1 : 1 } };
+      // "(12 (18, 18) sts) [12 sts decreased]" states both; keep both.
+      const inner = readDeclared(slice(t, 0, change.index));
+      return { ...inner, change: { ref: num.ref, sign: /^dec/i.test(change[2]) ? -1 : 1 } };
     }
   }
   const unitRe = /\s*(sts?|stitches)(\s+(rem|remain|remaining|on needle|on needles|total|in total|left))?\s*$/i;
@@ -481,7 +487,9 @@ function readDeclared(body: Slice): { rest: Slice; declared?: SizedRef; change?:
             const num = readSized(innerTrim);
             const numText = innerTrim.s.slice(0, unit.index).trim();
             if (num && num.length === numText.length) {
-              return { rest: stripTrailing(slice(t, 0, i)), declared: num.ref };
+              // "[12 sts decreased] (60 sts)": a stated change may come before the count.
+              const before = readDeclared(slice(t, 0, i));
+              return { rest: before.rest, declared: dashUnstated(num.ref), change: before.change };
             }
           }
           break;
