@@ -28,7 +28,13 @@ export type Op =
   | { t: "co"; n: SizedRef }
   /** Bind off n stitches, or all of them. */
   | { t: "bo"; n: SizedRef | "all" }
-  /** A zero-effect instruction we understood, e.g. pm, sm, turn work. */
+  /** A stitch worked until `leave` stitches remain before the next marker, e.g. "k to 2 sts before m". */
+  | { t: "toMarker"; code: string; leave: SizedRef }
+  /** A group repeated until `leave` stitches remain before the next marker, e.g. *p1, k1; rep from * to m. */
+  | { t: "repMarker"; body: Op[]; leave: SizedRef }
+  /** Place, slip or remove a stitch marker. */
+  | { t: "marker"; kind: "pm" | "sm" | "rm" }
+  /** A zero-effect instruction we understood, e.g. turn work. */
   | { t: "note"; text: string };
 
 export type Side = "RS" | "WS";
@@ -52,6 +58,10 @@ export interface Row {
   source: string;
   /** For rows expanded from "Rows a–b: rep rows c–d", the key of the row it copies. */
   copyOf?: string;
+  /** Which sizes work this row (one flag per size). Absent: every size. */
+  only?: boolean[];
+  /** "Rep last 2 rnds until 16 sts rem": these rows, repeated until the count is reached. */
+  until?: { count: SizedRef; cycle: Row[] };
 }
 
 export interface Unread {
@@ -69,7 +79,7 @@ export interface Program {
   ignored: number;
 }
 
-export type RowStatus = "ok" | "issue" | "warn" | "unverifiable";
+export type RowStatus = "ok" | "issue" | "warn" | "unverifiable" | "skipped";
 
 export interface IssueMessage {
   kind:
@@ -95,6 +105,8 @@ export interface RowResult {
   solved: number[];
   /** Sequence of stitch kinds made, for the stitch strip (capped). */
   strip: StripMark[];
+  /** Marker positions after the row, counted from the start of the next row. */
+  markers?: number[];
 }
 
 export type StripMark = "k" | "p" | "inc" | "decL" | "decR" | "decC" | "yo" | "sl" | "bo" | "co";

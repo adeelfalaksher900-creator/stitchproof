@@ -17,6 +17,8 @@ function groupRows(program: Program, result: SizeResult): Group[] {
   const groups: Group[] = [];
   program.rows.forEach((row, i) => {
     const r = result.rows[i];
+    // Rows another size works ("Large only") aren't part of this size's list.
+    if (r.status === "skipped") return;
     const prev = groups[groups.length - 1];
     const prevRow = prev ? program.rows[prev.end] : null;
     const prevRes = prev ? result.rows[prev.end] : null;
@@ -144,11 +146,11 @@ export function RowList({ program, result, sizeIndex, selectedKey, onSelect }: P
                 {row.unverifiable && <p className="text-[13px] text-warn">{row.unverifiable}, so Stitchproof doesn&apos;t guess its count.</p>}
                 <div className="flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-ink-3 tnum">
                   <span>On needle before: <b className="font-semibold text-ink-2">{g.result.before}</b></span>
-                  <span>Uses: <b className="font-semibold text-ink-2">{g.result.uses}</b></span>
-                  <span>Makes: <b className="font-semibold text-ink-2">{g.result.makes}</b></span>
+                  {!row.until && <span>Uses: <b className="font-semibold text-ink-2">{g.result.uses}</b></span>}
+                  {!row.until && <span>Makes: <b className="font-semibold text-ink-2">{g.result.makes}</b></span>}
                   {g.result.declared !== undefined && <span>Pattern says: <b className="font-semibold text-ink-2">{g.result.declared}</b></span>}
                 </div>
-                <StitchStrip marks={g.result.strip} label={`Stitches made in ${row.label}`} />
+                {g.result.strip.length > 0 && <StitchStrip marks={g.result.strip} label={`Stitches made in ${row.label}`} />}
               </div>
             )}
           </li>

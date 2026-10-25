@@ -1,4 +1,5 @@
 import { createGoogleGenerativeAI, google } from "@ai-sdk/google";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText, type LanguageModel } from "ai";
 import { z } from "zod";
 import { aiRead } from "@/lib/ai/reader";
@@ -15,8 +16,8 @@ interface Candidate {
 }
 
 /**
- * Models to try, in order: the visitor's own key (from the "AI key" box), then the site's Gemini key
- * (free tier), then Vercel AI Gateway when it has been turned on with a key or a chosen model.
+ * Models to try, in order: the visitor's own key (from the "AI key" box), the site's Gemini key (free tier),
+ * the site's OpenRouter key, then Vercel AI Gateway when it has been turned on with a key or a chosen model.
  */
 function candidates(userKey: string | null): Candidate[] {
   const list: Candidate[] = [];
@@ -29,6 +30,12 @@ function candidates(userKey: string | null): Candidate[] {
   }
   if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
     for (const id of ids) list.push({ label: `google/${id}`, model: google(id) });
+  }
+  if (process.env.OPENROUTER_API_KEY) {
+    const router = createOpenAICompatible({ name: "openrouter", baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY });
+    // A cheap paid model first, then OpenRouter's free-model router for keys with no credit.
+    const models = process.env.OPENROUTER_MODEL ? [process.env.OPENROUTER_MODEL] : ["google/gemini-2.5-flash-lite", "openrouter/free"];
+    for (const id of models) list.push({ label: `openrouter/${id}`, model: router(id) });
   }
   if (process.env.AI_GATEWAY_API_KEY || process.env.STITCHPROOF_MODEL) {
     for (const id of [process.env.STITCHPROOF_MODEL, "anthropic/claude-haiku-4.5"]) {
@@ -88,9 +95,10 @@ export async function POST(req: Request) {
           system,
           prompt,
           temperature: 0,
-          reasoning: "none",
+          // Gemini thinks by default; other routes get their provider's default.
+          ...(label.startsWith("google/") ? { reasoning: "none" as const } : {}),
           maxOutputTokens: 6000,
-          abortSignal: AbortSignal.any([deadline, AbortSignal.timeout(25_000)]),
+          abortSignal: AbortSignal.any([deadline, AbortSignal.timeout(label.startsWith("openrouter/") ? 25_000 : 18_000)]),
         });
         return text;
       });

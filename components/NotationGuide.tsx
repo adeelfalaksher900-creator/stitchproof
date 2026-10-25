@@ -11,7 +11,10 @@ const EXAMPLES: [string, string][] = [
   ["K2, *p2, k2; rep from * to end.", "Star repeats, also “to last 3 sts”, “4 more times”, “around”"],
   ["[K1, p1] 5 times.   (k1, p1) x 5", "Bracket repeats"],
   ["K to last st, m1r, k1.", "Whole and partial rows"],
+  ["*K to 2 sts before m, k2tog, sm; rep from * to end.", "Stitch markers: pm, sm, rm, “k to m”, “to 2 sts before m”"],
   ["Rows 7–40: Rep rows 5–6.", "Repeating earlier rows"],
+  ["Rep last 2 rnds 3 (4, 5) more times.", "Repeats that differ by size, also “– (1, 2)” and “until 16 sts rem”"],
+  ["Large and XL sizes only:   All sizes:", "Sections only some sizes work"],
   ["(72 (81, 90) sts)   — 72 sts", "Stated stitch counts"],
   ["Sizes: S (M, L)", "Size names"],
 ];
@@ -66,8 +69,8 @@ export function NotationGuide({ label = "What can I paste?" }: { label?: string 
           <p className="mono mt-2 text-[12.5px] leading-6 text-ink-2">{codes.join(" · ")}</p>
           <h3 className="mt-6 text-[14px] font-semibold">Marked “can’t verify” instead of guessed</h3>
           <p className="mt-1 text-[13.5px] text-ink-2">
-            Short rows (w&amp;t), working “to marker”, and anything worked to a measurement (“until piece measures 6 in”). The count is carried forward and the
-            rest of the pattern is still checked.
+            Short rows (w&amp;t) and anything worked to a measurement (“until piece measures 6 in”). The count is carried forward and the rest of the
+            pattern is still checked.
           </p>
         </div>
       </dialog>

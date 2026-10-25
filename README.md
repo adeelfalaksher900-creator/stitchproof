@@ -124,8 +124,11 @@ npm run dev          # http://localhost:3000
 
 The offline reader, counter, fixer and Knit mode work with no configuration. To use the AI reader, copy `.env.example` to `.env.local` and set **one** of:
 
-- `GOOGLE_GENERATIVE_AI_API_KEY` — a free Google Gemini key (default models `gemini-flash-lite-latest` then `gemini-flash-latest`; override with `GEMINI_MODEL`), or
-- `AI_GATEWAY_API_KEY` or `STITCHPROOF_MODEL` — turns on Vercel AI Gateway as a further fallback.
+- `GOOGLE_GENERATIVE_AI_API_KEY` — a free Google Gemini key (default models `gemini-flash-lite-latest` then `gemini-flash-latest`; override with `GEMINI_MODEL`),
+- `OPENROUTER_API_KEY` — an [OpenRouter](https://openrouter.ai/keys) key (default models `google/gemini-2.5-flash-lite` then `openrouter/free`; override with `OPENROUTER_MODEL`), or
+- `AI_GATEWAY_API_KEY` or `STITCHPROOF_MODEL` — turns on Vercel AI Gateway.
+
+With several set, they're tried in that order, so OpenRouter takes over if the Gemini key fails or hits its quota.
 
 ## Accuracy
 
@@ -150,7 +153,7 @@ BASE_URL=https://stitchproof-alpha.vercel.app npx playwright test   # against pr
 
 ## Deploy
 
-Import the repository into Vercel (framework: Next.js) and add `GOOGLE_GENERATIVE_AI_API_KEY` as a sensitive environment variable. Visitors can also paste their own Gemini key under **AI key** on the Proof page (kept only in their browser, sent only with AI readings, never stored or logged by the server).
+Import the repository into Vercel (framework: Next.js) and add `GOOGLE_GENERATIVE_AI_API_KEY` and/or `OPENROUTER_API_KEY` as sensitive environment variables. Visitors can also paste their own Gemini key under **AI key** on the Proof page (kept only in their browser, sent only with AI readings, never stored or logged by the server).
 
 ## Notation it reads offline
 
@@ -164,15 +167,20 @@ Import the repository into Vercel (framework: Next.js) and add `GOOGLE_GENERATIV
 | `[k1, p1] 5 times` / `[k1, p1] to end` | bracket repeats |
 | `k to end`, `p to last 2 sts`, `k to last st`, `Knit.` | whole/partial rows |
 | `Rows 5–20: Rep rows 3–4.` / `Rep last 2 rows 4 more times.` | row repeats |
+| `pm`, `sm`, `rm`, `k to m`, `*k to 2 sts before m, k2tog, sm; rep from * to end` | stitch markers (positions are carried row to row and mirrored on flat rows) |
+| `Rep last 2 rnds 3 (4, 5) more times.` / `– (1, 2) more times` / `Rnds 13–40 (13–46, 13–52):` | row counts that differ by size |
+| `Rep last 2 rnds until 16 (20) sts rem.` | repeats until a count — checked to land exactly on it |
+| `Adult S and Adult L sizes only:` … `All sizes:` | sections only some sizes work |
+| `Dec rnd:` / `Inc row:` / `With smaller needle, CO 88 sts.` | common published phrasing |
 | `(72 (81, 90) sts)` / `— 72 sts` | stated counts |
-| `w&t`, `work even until 6 in`, `rep rows 1–2 until…` | marked *can't verify* (never guessed) |
+| `w&t`, `work even until 6 in`, `rep rnd 1 until piece measures 2 in` | marked *can't verify* (never guessed) |
 
 ## Limitations
 
 - Knitting only (crochet's turning-chain conventions need their own rules).
 - Text only — no charts, photos or PDFs.
-- Row counts that differ by size ("Rnds 13–40 (13–46, 13–52)", "repeat – (0, 1, 2) more times") aren't supported yet.
-- Working "to 2 stitches before next marker" is marked *can't verify*. Many published patterns place markers, so they are only partly verified today; marker-aware counting is next.
+- Rows worked to a length ("until piece measures 6 in") and short rows can't be settled by counting; they're marked *can't verify* and the count is carried forward.
+- Not yet tested by knitters outside the team. If you try it on a real pattern, please [open an issue](https://github.com/adeelfalaksher900-creator/stitchproof/issues) with what it got wrong.
 - The rate limit is per server instance (best effort).
 
 ## Built with AI — disclosure

@@ -31,8 +31,14 @@ export function KnitView({ id }: { id: string }) {
   const safeSize = Math.min(sizeIndex, Math.max(0, (proof?.program.sizes.length ?? 1) - 1));
 
   const go = useCallback(
-    (next: number) => {
+    (target: number) => {
       if (!total) return;
+      // Step over rows this size doesn't work ("Large only").
+      const results = proof?.sizes[safeSize]?.rows;
+      const dir = target >= safeRow ? 1 : -1;
+      let next = target;
+      while (next >= 0 && next < total && results?.[next]?.status === "skipped") next += dir;
+      if (next < 0) return;
       if (next >= total) {
         setDone(true);
         return;
@@ -42,7 +48,7 @@ export function KnitView({ id }: { id: string }) {
       setRow(clamped);
       update(id, { row: clamped });
     },
-    [id, total],
+    [id, total, proof, safeSize, safeRow],
   );
 
   useEffect(() => {
@@ -77,8 +83,9 @@ export function KnitView({ id }: { id: string }) {
   const result = proof.sizes[safeSize].rows[safeRow];
   const sizes = proof.program.sizes;
   const pct = done ? 100 : Math.round((safeRow / Math.max(1, total - 1)) * 100);
-  const counted = rows.filter((r) => r.number !== null).length;
-  const countedSoFar = rows.slice(0, safeRow + 1).filter((r) => r.number !== null).length;
+  const worked = (r: (typeof rows)[number], i: number) => r.number !== null && proof.sizes[safeSize].rows[i]?.status !== "skipped";
+  const counted = rows.filter(worked).length;
+  const countedSoFar = rows.slice(0, safeRow + 1).filter(worked).length;
 
   return (
     <div className="flex min-h-dvh flex-col">

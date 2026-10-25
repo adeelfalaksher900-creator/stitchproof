@@ -32,9 +32,9 @@ function refsOf(ops: Op[], out: SizedRef[] = []): SizedRef[] {
   for (const op of ops) {
     if (op.t === "st" || op.t === "co") out.push(op.n);
     else if (op.t === "bo" && op.n !== "all") out.push(op.n);
-    else if (op.t === "toEnd") out.push(op.leave);
+    else if (op.t === "toEnd" || op.t === "toMarker") out.push(op.leave);
     else if (op.t === "rep") { out.push(op.times); refsOf(op.body, out); }
-    else if (op.t === "repEnd") { out.push(op.leave); refsOf(op.body, out); }
+    else if (op.t === "repEnd" || op.t === "repMarker") { out.push(op.leave); refsOf(op.body, out); }
   }
   return out.filter((r) => r.spans && r.spans.some(Boolean));
 }
@@ -77,13 +77,14 @@ export function findFixes(text: string, program: Program, rowKey: string, size: 
   const scan: number[] = [rowIndex];
   for (let i = rowIndex - 1; i >= 0 && scan.length < 3; i--) {
     const r = baseSize.rows[i];
-    if (r && r.makes !== r.uses) scan.push(i);
+    if (r && (r.makes !== r.uses || program.rows[i].until)) scan.push(i);
   }
   for (const idx of scan) {
     const r = program.rows[idx];
     if (seenLines.has(r.line) && idx !== rowIndex) continue;
     seenLines.add(r.line);
     for (const ref of refsOf(r.ops)) candidates.push({ ref, role: "instruction", rowIndex: idx });
+    if (r.until?.count.spans?.some(Boolean)) candidates.push({ ref: r.until.count, role: "instruction", rowIndex: idx });
   }
   if (row.declared?.spans?.some(Boolean)) candidates.push({ ref: row.declared, role: "declared", rowIndex });
 

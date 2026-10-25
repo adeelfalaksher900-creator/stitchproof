@@ -17,6 +17,9 @@ OUTPUT RULES
 - Stitches, comma-separated: k<n>, p<n>, k2tog, p2tog, ssk, ssp, k3tog, sk2p, cdd, yo, m1, m1l, m1r, m1p, kfb, pfb, sl<n>, ktbl, ptbl.
 - Whole row of one stitch: "Knit." or "Purl." Partial: "k to end", "p to last <n> sts".
 - Repeats: "*<stitches>; rep from * to end" or "*<stitches>; rep from * to last <n> sts, <stitches>" or "[<stitches>] <n> times". In rounds use "rep from * around".
+- Stitch markers: "pm" (place), "sm" (slip), "rm" (remove), "k to m", "k to 2 sts before m", e.g. "*K to 2 sts before m, k2tog, sm; rep from * to end." Keep every marker where the pattern puts it.
+- Repeating the rows just worked: "Rep last <n> rnds <times> more times." or "Rep rnds <a>–<b> <times> more times." Times can differ by size, e.g. "3 (4, 5)"; write "–" for a size that doesn't repeat, e.g. "– (1, 2)". Until a count: "Rep last 2 rnds until 16 sts rem."
+- Rows only some sizes work: a line "<size names> sizes only:" before them and "All sizes:" after.
 - Stated stitch counts: only when the pattern states one, end the row with "(<n> sts)" using the pattern's number unchanged.
 - Bind off: "BO all sts." Gathering the last stitches: "Cut yarn, draw through rem sts."
 - If something cannot be expressed in this notation (worked to a measurement with no row count, short rows, charts), write one line "UNSURE: <the original text>" instead of guessing.

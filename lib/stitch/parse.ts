@@ -50,24 +50,32 @@ function stripTrailing(src: Slice): Slice {
   return { s, at: src.at };
 }
 
-const SIZED_RE = /^(\d+)(?:\s*\(\s*(\d+(?:\s*,\s*\d+)*)\s*\)|((?:\s*\/\s*\d+)+))?/;
+// A dash in a size group ("– (0, 1, 2)") means "not in this size": zero.
+const SIZED_RE = /^(\d+|[–—-](?=\s*\())(?:\s*\(\s*((?:\d+|[–—-])(?:\s*,\s*(?:\d+|[–—-]))*)\s*\)|((?:\s*\/\s*\d+)+))?/;
 
-/** Read a sized number ("72", "72 (81, 90)", "72/81/90") at the start of a slice. */
+/** Read a sized number ("72", "72 (81, 90)", "72/81/90", "– (1, 2)") at the start of a slice. */
 function readSized(src: Slice): { ref: SizedRef; length: number } | null {
   const m = SIZED_RE.exec(src.s);
   if (!m) return null;
-  const values: number[] = [num(m[1])];
-  const spans: Span[] = [{ start: src.at, end: src.at + m[1].length }];
+  const dash = /^[–—-]$/.test(m[1]);
+  if (dash && !m[2]) return null;
+  const values: number[] = [dash ? 0 : num(m[1])];
+  const spans: (Span | undefined)[] = [dash ? undefined : { start: src.at, end: src.at + m[1].length }];
   const rest = m[2] ?? m[3];
   if (rest) {
     // Find each further number with its exact offset.
     const restStart = m[0].indexOf(rest, m[1].length);
-    const numRe = /\d+/g;
+    const numRe = /\d+|[–—-]/g;
     let nm: RegExpExecArray | null;
     while ((nm = numRe.exec(rest))) {
-      values.push(num(nm[0]));
-      const start = src.at + restStart + nm.index;
-      spans.push({ start, end: start + nm[0].length });
+      if (/^\d/.test(nm[0])) {
+        values.push(num(nm[0]));
+        const start = src.at + restStart + nm.index;
+        spans.push({ start, end: start + nm[0].length });
+      } else {
+        values.push(0);
+        spans.push(undefined);
+      }
     }
   }
   return { ref: { values, spans }, length: m[0].length };
@@ -118,7 +126,24 @@ function matchingClose(s: string, open: number): number {
 
 type RepeatSpec =
   | { kind: "times"; ref: SizedRef; more: boolean }
-  | { kind: "toEnd"; leave: SizedRef };
+  | { kind: "toEnd"; leave: SizedRef }
+  | { kind: "toMarker"; leave: SizedRef };
+
+const MARKER_WORD = String.raw`(?:the\s+)?(?:next\s+)?(?:m|marker|st\s*marker|stitch\s+marker)`;
+const TO_MARKER_RE = new RegExp(String.raw`^to\s+${MARKER_WORD}$`);
+const BEFORE_MARKER_RE = new RegExp(String.raw`^to\s+(?:within\s+)?`);
+const BEFORE_TAIL_RE = new RegExp(String.raw`^(?:st|sts|stitch|stitches)?\s*(?:before|from)\s+${MARKER_WORD}$`);
+
+/** "to marker" (leave 0) or "to 2 sts before next marker" (leave 2), else null. */
+function readMarkerSpec(t: Slice): SizedRef | null {
+  const s = t.s.toLowerCase();
+  if (TO_MARKER_RE.test(s)) return zero();
+  const b = BEFORE_MARKER_RE.exec(s);
+  if (!b) return null;
+  const c = readSized(slice(t, b[0].length));
+  if (!c) return null;
+  return BEFORE_TAIL_RE.test(s.slice(b[0].length + c.length).trim()) ? c.ref : null;
+}
 
 /** Parse "to end", "to last 3 sts", "5 times", "4 more times", "around", "across". */
 function readRepeatSpec(src: Slice): RepeatSpec | null {
@@ -128,6 +153,8 @@ function readRepeatSpec(src: Slice): RepeatSpec | null {
     return { kind: "toEnd", leave: zero() };
   }
   if (/^to (?:the )?last (st|stitch)$/.test(s)) return { kind: "toEnd", leave: one() };
+  const mk = readMarkerSpec(t);
+  if (mk) return { kind: "toMarker", leave: mk };
   const last = /^to (?:the )?last\s+/.exec(s);
   if (last) {
     const c = readSized(slice(t, last[0].length));
@@ -142,8 +169,8 @@ function readRepeatSpec(src: Slice): RepeatSpec | null {
   if (c) {
     const tail = s.slice(from + c.length).trim();
     if (x && tail === "") return { kind: "times", ref: c.ref, more: false };
-    if (/^more times?$|^times more$/.test(tail)) return { kind: "times", ref: c.ref, more: true };
-    if (/^(times?|total|times in total|times total)$/.test(tail)) return { kind: "times", ref: c.ref, more: false };
+    if (/^more times?$|^more time\(s\)$|^times more$/.test(tail)) return { kind: "times", ref: c.ref, more: true };
+    if (/^(times?|time\(s\)|total|times in total|times total)$/.test(tail)) return { kind: "times", ref: c.ref, more: false };
     if (tail === "" && /^(once|twice|thrice)$/.test(s.slice(from, from + c.length))) {
       return { kind: "times", ref: c.ref, more: false };
     }
@@ -157,7 +184,10 @@ function addOne(ref: SizedRef): SizedRef {
   return { values: ref.values.map((v) => v + 1), spans: ref.spans, offset: 1 };
 }
 
-const NOTE_RE = /^(pm|sm|rm|place (a )?marker|slip marker|remove marker|place beginning of (rnd|round) marker|pm for beg(inning)? of (rnd|round)|turn|join( to work in the (rnd|round))?|being careful not to twist)$/i;
+const NOTE_RE = /^(turn|join( to work in the (rnd|round))?|being careful not to twist)$/i;
+const PM_RE = /^(pm|place (a |new |unique |beginning of (rnd|round) )?(st |stitch )?marker|pm for (beg|beginning|end) of (rnd|round)|place marker for (beg|beginning|end) of (rnd|round)|replace marker( for new (beg|beginning|end) of (rnd|round))?)$/i;
+const SM_RE = /^(sm|slip (the )?marker|sl m|slm)$/i;
+const RM_RE = /^(rm|remove (the |unique |beginning of (rnd|round) |end of (rnd|round) )?marker|remove (unique )?(beg|end)-of-(rnd|round) marker)$/i;
 const SHORT_ROW_RE = /\b(w&t|wrap and turn|w\s*&\s*t|turn work|german short row|gsr|mds)\b/i;
 
 /** Parse one stitch item like "k2", "k2tog", "p to last 3 sts", "yo", "k2 (3, 4)". */
@@ -166,6 +196,9 @@ function readItem(src: Slice): Op {
   const lower = t.s.toLowerCase().replace(/’/g, "'");
 
   if (NOTE_RE.test(lower)) return { t: "note", text: t.s };
+  if (PM_RE.test(lower)) return { t: "marker", kind: "pm" };
+  if (SM_RE.test(lower)) return { t: "marker", kind: "sm" };
+  if (RM_RE.test(lower)) return { t: "marker", kind: "rm" };
 
   // Cast on / bind off inside a row.
   const co = /^(co|cast on)\s+/.exec(lower);
@@ -207,8 +240,16 @@ function readItem(src: Slice): Op {
     if (!/^(st|sts|stitch|stitches)?$/.test(tail)) throw new ReadError(`Couldn't read "${t.s}"`);
     return { t: "toEnd", code, leave: c.ref };
   }
-  const toMarker = /^([a-z0-9-]+?)\s+to (?:next |the )?(m|marker)$/.exec(lower);
-  if (toMarker) throw new ReadError("UNVERIFIABLE:Working to a marker depends on marker positions");
+  // "k to m", "p to 2 sts before next marker", "work in rib to marker".
+  const toM = /^([a-z0-9-]+?)\s+(to\s.*)$/.exec(lower);
+  if (toM) {
+    const leave = readMarkerSpec(slice(t, toM[0].length - toM[2].length));
+    if (leave) {
+      const code = toM[1] === "knit" ? "k" : toM[1] === "purl" ? "p" : codeOf(toM[1]);
+      if (!code) throw new ReadError(`Unknown stitch "${toM[1]}"`);
+      return { t: "toMarker", code, leave };
+    }
+  }
 
   // Words: "knit 2", "purl 3", "slip 1", "knit 2 together".
   const words = lower
@@ -294,11 +335,7 @@ function readSeq(src: Slice): Op[] {
       const suffixStart = specText.at + specText.s.length - t.at;
       const suffix = slice(t, suffixStart).s.replace(/^[\s,;]+/, "");
       const suffixSlice = { s: suffix, at: t.at + t.s.length - suffix.length };
-      const op: Op =
-        spec.kind === "toEnd"
-          ? { t: "repEnd", body: bodyOps, leave: spec.leave }
-          : { t: "rep", body: bodyOps, times: spec.more ? addOne(spec.ref) : spec.ref };
-      return [...readSeq(prefix), op, ...readSeq(suffixSlice)];
+      return [...readSeq(prefix), repeatOp(bodyOps, spec), ...readSeq(suffixSlice)];
     }
     // A lone star with no "rep from *" is a convention we don't support.
     throw new ReadError(`Found "*" without "rep from *"`);
@@ -313,17 +350,18 @@ function readSeq(src: Slice): Op[] {
       const after = slice(part, close + 1);
       const spec = readRepeatSpec(after);
       if (!spec) throw new ReadError(`Couldn't read how often to repeat "${p}"`);
-      const bodyOps = readSeq(inner);
-      ops.push(
-        spec.kind === "toEnd"
-          ? { t: "repEnd", body: bodyOps, leave: spec.leave }
-          : { t: "rep", body: bodyOps, times: spec.more ? addOne(spec.ref) : spec.ref },
-      );
+      ops.push(repeatOp(readSeq(inner), spec));
       continue;
     }
     ops.push(readItem(part));
   }
   return ops;
+}
+
+function repeatOp(body: Op[], spec: RepeatSpec): Op {
+  if (spec.kind === "toEnd") return { t: "repEnd", body, leave: spec.leave };
+  if (spec.kind === "toMarker") return { t: "repMarker", body, leave: spec.leave };
+  return { t: "rep", body, times: spec.more ? addOne(spec.ref) : spec.ref };
 }
 
 function topLevelIndex(s: string, ch: string): number {
@@ -382,7 +420,7 @@ function readDeclared(body: Slice): { rest: Slice; declared?: SizedRef } {
 }
 
 const ROW_HEAD_RE =
-  /^(set-?up\s+(?:row|rnd|round)|next\s+(?:row|rnd|round)|(?:row|rnd|round|r)s?)\s*(\d+)?(?:\s*(?:-|–|—|to|through|and)\s*(\d+))?\s*(?:\(\s*(rs|ws)\s*\)|\[\s*(rs|ws)\s*\]|(rs|ws))?\s*[:.]\s*/i;
+  /^((?:set-?up|foundation)\s+(?:row|rnd|round)|(?:next|dec(?:rease)?|inc(?:rease)?)\s+(?:row|rnd|round)|(?:row|rnd|round|r)s?)\s*(\d+)?(?:\s*(?:-|–|—|to|through|and)\s*(\d+))?(?:\s*\(\s*(\d+(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+(?:\s*[-–—]\s*\d+)?)*)\s*\))?\s*(?:\(\s*(rs|ws)\s*\)|\[\s*(rs|ws)\s*\]|(rs|ws))?\s*[:.]\s*/i;
 
 const ROW_REPEAT_RE =
   /^(?:rep(?:eat)?|work)\s+(?:as\s+(?:for\s+)?)?(?:(?:row|rnd|round)s?)\s+(\d+)(?:\s*(?:-|–|—|to|through|and)\s*(\d+))?(?:\s+(.*))?$/i;
@@ -395,6 +433,17 @@ const ROWS_FROM_RE =
 
 const EVERY_RE =
   /^(row|rnd|round)\s+(\d+)\s*\(?\s*(?:and|&)\s+(?:all|every|each)\s+(?:(?:following|foll|subsequent|remaining|other)\s+)?(rs|ws|right[- ]side|wrong[- ]side|even[- ]numbered|odd[- ]numbered|even|odd)\s+(?:rows?|rnds?|rounds?)\s*\)?\s*(?:\(\s*(rs|ws)\s*\))?\s*[:.]\s*/i;
+
+/** "Kid, Adult Small + Adult Large sizes only", "Sizes M and L only", "All sizes". */
+const SIZES_ONLY_RE = /^(?:for\s+|in\s+)?(?:sizes?\s+)?(.+?)\s+(?:sizes?\s+)?only\s*[:.]?$/i;
+const ALL_SIZES_RE = /^(?:for\s+|in\s+)?all\s+sizes\s*[:.]?$/i;
+
+function sizeKey(name: string): string {
+  return name.toLowerCase()
+    .replace(/extra[\s-]*large/g, "xl").replace(/extra[\s-]*small/g, "xs")
+    .replace(/\bsmall\b/g, "s").replace(/\bmedium\b/g, "m").replace(/\blarge\b/g, "l")
+    .replace(/[^a-z0-9]/g, "");
+}
 
 const SECTION_HINT = /\b(k\d|p\d|knit|purl|k2tog|ssk|yo|rep|cast on|bind off|bo\b|co\b|row|rnd|round|stitch|sts|inc|dec|work even|continue)\b/i;
 
@@ -422,6 +471,14 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
   const ruleCovers = (n: number) => rule !== null && n > rule.start && (n - rule.start) % 2 === 0;
 
   const nextKey = () => `r${++keySeq}`;
+  // While a "sizes only" section is open, rows apply to those sizes alone.
+  let sectionOnly: boolean[] | null = null;
+  const both = (a?: boolean[], b?: boolean[] | null): boolean[] | undefined => {
+    if (!a) return b ?? undefined;
+    if (!b) return a;
+    const n = Math.max(a.length, b.length);
+    return Array.from({ length: n }, (_, i) => (a.length === 1 ? a[0] : a[i]) && (b.length === 1 ? b[0] : b[i]));
+  };
 
   const noteSizes = (ref?: SizedRef) => {
     if (ref) maxSizes = Math.max(maxSizes, ref.values.length);
@@ -430,14 +487,52 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
     for (const op of ops) {
       if (op.t === "st" || op.t === "co") noteSizes(op.n);
       else if (op.t === "bo" && op.n !== "all") noteSizes(op.n);
-      else if (op.t === "toEnd") noteSizes(op.leave);
+      else if (op.t === "toEnd" || op.t === "toMarker") noteSizes(op.leave);
       else if (op.t === "rep") { noteSizes(op.times); noteOps(op.body); }
-      else if (op.t === "repEnd") { noteSizes(op.leave); noteOps(op.body); }
+      else if (op.t === "repEnd" || op.t === "repMarker") { noteSizes(op.leave); noteOps(op.body); }
     }
   };
 
   const pushRow = (row: Row) => {
     if (rows.length >= MAX_ROWS) throw new ReadError(`Stitchproof checks up to ${MAX_ROWS.toLocaleString("en-US")} rows`);
+    row.only = both(row.only, sectionOnly);
+    if (row.only) {
+      maxSizes = Math.max(maxSizes, row.only.length);
+      const active = row.only.filter(Boolean).length;
+      // "Adult S and Adult L sizes only: … (87 (95) sts)" gives one number per working size; spread them out.
+      if (row.only.length > 1 && active > 1 && active < row.only.length) {
+        const spread = (ref: SizedRef): SizedRef => {
+          if (ref.values.length !== active) return ref;
+          let k = 0;
+          const values: number[] = [];
+          const spans: (Span | undefined)[] = [];
+          row.only!.forEach((on) => {
+            values.push(on ? ref.values[k] : Number.NaN);
+            spans.push(on ? ref.spans?.[k] : undefined);
+            if (on) k++;
+          });
+          return { values, spans, offset: ref.offset };
+        };
+        const spreadOps = (ops: Op[]): Op[] => ops.map((op): Op => {
+          switch (op.t) {
+            case "st": case "co": return { ...op, n: spread(op.n) };
+            case "bo": return op.n === "all" ? op : { ...op, n: spread(op.n) };
+            case "toEnd": case "toMarker": return { ...op, leave: spread(op.leave) };
+            case "rep": return { ...op, times: spread(op.times), body: spreadOps(op.body) };
+            case "repEnd": case "repMarker": return { ...op, leave: spread(op.leave), body: spreadOps(op.body) };
+            default: return op;
+          }
+        });
+        row.ops = spreadOps(row.ops);
+        if (row.declared) row.declared = spread(row.declared);
+      }
+    }
+    // A row only the larger sizes work doesn't move the first size's row numbers.
+    if (row.only && !row.only[0] && row.only.length > 1) {
+      if (row.number !== null && !row.copyOf) row.label = `Extra ${row.round ? "rnd" : "row"}`;
+      rows.push(row);
+      return;
+    }
     if (rule && row.number !== null && !skipFill) {
       for (let k = lastNumber + 1; k < row.number; k++) {
         if (!ruleCovers(k)) continue;
@@ -457,7 +552,10 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
     }
   };
 
-  const copyRows = (from: number, to: number, startNumber: number, count: number, line: number, source: string, declared?: SizedRef) => {
+  const copyRows = (
+    from: number, to: number, startNumber: number, count: number, line: number, source: string,
+    declared?: SizedRef, onlyAt?: (i: number) => boolean[] | undefined,
+  ) => {
     const cycle: Row[] = [];
     for (let n = from; n <= to; n++) {
       const r = byNumber.get(n) ?? (ruleCovers(n) ? rule!.row : undefined);
@@ -479,6 +577,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         unverifiable: src.unverifiable,
         source,
         copyOf: src.key,
+        only: both(src.only, onlyAt?.(i) ?? null),
       });
     }
   };
@@ -516,12 +615,26 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         continue;
       }
 
+      if (ALL_SIZES_RE.test(stripTrailing(line).s)) { sectionOnly = null; ignored++; continue; }
+      const onlyM = SIZES_ONLY_RE.exec(stripTrailing(line).s);
+      if (onlyM && !ROW_HEAD_RE.test(line.s) && sizeNames) {
+        const wanted = onlyM[1].split(/,|\+|&|\/|\band\b/i).map((x) => sizeKey(x)).filter(Boolean);
+        const known = sizeNames.map(sizeKey);
+        if (wanted.length && wanted.every((w) => known.includes(w))) {
+          sectionOnly = known.map((k) => wanted.includes(k));
+          ignored++;
+          continue;
+        }
+        throw new ReadError(`Couldn't match "${onlyM[1]}" to the sizes ${sizeNames.join(", ")}`);
+      }
+
       if (/\bin the (rnd|round)\b|\bjoin\b|\bcircular\b|\bdpns?\b/i.test(lower) && !ROW_HEAD_RE.test(line.s)) {
         round = round || /\bjoin\b|\bin the (rnd|round)\b/i.test(lower);
       }
 
       // Cast-on line.
-      const co = /^(co|cast on)\s+/i.exec(line.s);
+      // "CO 88 sts." / "With smaller needle, cast on 88 (96) sts."
+      const co = /^(?:(?:with|using)\b[^,.:;]{0,60},\s*)?(?:co|cast on)\s+/i.exec(line.s);
       if (co) {
         const c = readSized(slice(line, co[0].length));
         if (!c) throw new ReadError("Couldn't read the cast-on count");
@@ -556,29 +669,52 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
       }
 
       // "Rep last 2 rows 3 more times." / "Rep rows 1–2 four more times."
-      const lastM = LAST_ROWS_RE.exec(stripTrailing(line).s);
-      const fromM = ROWS_FROM_RE.exec(stripTrailing(line).s);
+      const repLine = readDeclared(stripTrailing(line));
+      const lastM = LAST_ROWS_RE.exec(stripTrailing(repLine.rest).s);
+      const fromM = ROWS_FROM_RE.exec(stripTrailing(repLine.rest).s);
+      const blockOf = () => {
+        const n = lastM ? (/^\d+$/.test(lastM[1]) ? num(lastM[1]) : WORD_NUMBERS[lastM[1].toLowerCase()]) : 0;
+        if (lastM && !n) throw new ReadError("Couldn't read how many rows to repeat");
+        return lastM ? { from: lastNumber - n + 1, to: lastNumber } : { from: num(fromM![2]), to: num(fromM![3]) };
+      };
       if ((lastM || fromM) && /\buntil\b/i.test(lastM ? lastM[3] : fromM![4])) {
+        // "until 16 (20) sts rem": the count settles how many repeats, so it can be checked.
+        const tail = lastM ? lastM[3] : fromM![4];
+        const um = /\buntil\s+(?:there\s+are\s+)?(.+?)\s*(?:sts?|stitches)\s+(?:rem(?:ain)?s?|remaining|left|on (?:the )?needles?)\b/i.exec(tail);
+        const untilAt = line.s.search(/\buntil\b/i);
+        const target = um && readSized({ s: um[1], at: line.at + untilAt + um[0].indexOf(um[1], 5) });
+        if (target && target.length === um![1].length) {
+          const { from, to } = blockOf();
+          const cycle: Row[] = [];
+          for (let n = from; n <= to; n++) {
+            const r = byNumber.get(n) ?? (ruleCovers(n) ? rule!.row : undefined);
+            if (!r) throw new ReadError(`Row ${n} hasn't been defined yet`);
+            cycle.push(r);
+          }
+          const count = target.ref;
+          noteSizes(count);
+          pushRow({
+            key: nextKey(), label: `Rep to ${target.ref.values.join("/")} sts`, number: null, line: li, round,
+            ops: [], source: line.s, declared: repLine.declared, until: { count, cycle },
+          });
+          skipFill = true;
+          continue;
+        }
         pushUntil(li, line.s);
         continue;
       }
       if (lastM || fromM) {
         const spec = readRepeatSpec({ s: (lastM ? lastM[3] : fromM![4]), at: 0 });
         if (!spec || spec.kind !== "times") throw new ReadError("Couldn't read how many times to repeat");
-        if (spec.ref.values.length !== 1) throw new ReadError("Row repeats that differ by size aren't supported");
-        let from: number;
-        let to: number;
-        if (lastM) {
-          const n = /^\d+$/.test(lastM[1]) ? num(lastM[1]) : WORD_NUMBERS[lastM[1].toLowerCase()];
-          if (!n) throw new ReadError("Couldn't read how many rows to repeat");
-          to = lastNumber;
-          from = lastNumber - n + 1;
-        } else {
-          from = num(fromM![2]);
-          to = num(fromM![3]);
-        }
-        const total = spec.ref.values[0] * (to - from + 1);
-        copyRows(from, to, lastNumber + 1, total, li, line.s);
+        const { from, to } = blockOf();
+        noteSizes(repLine.declared);
+        const len = to - from + 1;
+        const counts = spec.ref.values;
+        noteSizes(spec.ref);
+        const total = Math.max(...counts) * len;
+        // Each size repeats the block its own number of times; extra copies are skipped for smaller sizes.
+        const onlyAt = counts.length > 1 ? (i: number) => counts.map((c) => Math.floor(i / len) < c) : undefined;
+        copyRows(from, to, lastNumber + 1, total, li, line.s, repLine.declared, onlyAt);
         continue;
       }
 
@@ -588,7 +724,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         continue;
       }
 
-      if (/^(work|continue|cont|knit|purl)\b.*\buntil\b/i.test(line.s) && !ROW_HEAD_RE.test(line.s)) {
+      if (/^(work|continue|cont|knit|purl|rep(?:eat)?)\b.*\buntil\b/i.test(line.s) && !ROW_HEAD_RE.test(line.s)) {
         pushUntil(li, line.s);
         continue;
       }
@@ -623,15 +759,28 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
       const kind = head[1].toLowerCase();
       if (/^(rnd|round)/.test(kind) || /(rnd|round)/.test(kind)) round = true;
       else if (/row/.test(kind)) round = false;
-      const isNext = kind.startsWith("next");
-      const isSetup = kind.startsWith("set");
-      const sideRaw = (head[4] ?? head[5] ?? head[6])?.toUpperCase() as Side | undefined;
+      // "Dec rnd:" / "Inc row:" without a number is simply the next row.
+      const isNext = kind.startsWith("next") || (/^(dec|inc)/.test(kind) && !head[2]);
+      const isSetup = /^(set|foundation)/.test(kind);
+      const sideRaw = (head[5] ?? head[6] ?? head[7])?.toUpperCase() as Side | undefined;
       let start: number | null = head[2] ? num(head[2]) : null;
       let end: number | null = head[3] ? num(head[3]) : null;
       if (isNext) start = lastNumber + 1;
       if (start === null && !isSetup) throw new ReadError("Row number missing");
       if (end !== null && start !== null && end < start) throw new ReadError("Row range runs backwards");
       if (start !== null && end === null && /and/i.test(line.s.slice(0, head[0].length))) end = start;
+      // "Rnds 13–40 (13–46, 13–52)": each size works its own number of rows.
+      let perSize: number[] | null = null;
+      if (head[4] && start !== null) {
+        const firstLen = (end ?? start) - start + 1;
+        const others = head[4].split(",").map((g) => {
+          const [a, b] = g.split(/[-–—]/).map((x) => num(x.trim()));
+          if (b !== undefined && b < a) throw new ReadError("Row range runs backwards");
+          return b === undefined ? 1 : b - a + 1;
+        });
+        const lens = [firstLen, ...others];
+        if (lens.some((l) => l !== firstLen)) perSize = lens;
+      }
 
       const bodySlice = slice(line, head[0].length);
       const bodyStripped = stripTrailing(trim(bodySlice));
@@ -651,8 +800,9 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         const to = rr[2] ? num(rr[2]) : from;
         const { declared } = pre;
         noteSizes(declared);
-        const count = end !== null && start !== null ? end - start + 1 : 1;
-        copyRows(from, to, start ?? lastNumber + 1, count, li, line.s, declared);
+        const count = perSize ? Math.max(...perSize) : end !== null && start !== null ? end - start + 1 : 1;
+        const lens = perSize;
+        copyRows(from, to, start ?? lastNumber + 1, count, li, line.s, declared, lens ? (i) => lens.map((l) => i < l) : undefined);
         continue;
       }
 
@@ -671,7 +821,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
       }
       noteOps(ops);
       if (!rowUnverifiable && ops.length === 0) throw new ReadError("No stitches in this row");
-      const count = end !== null && start !== null ? end - start + 1 : 1;
+      const count = perSize ? Math.max(...perSize) : end !== null && start !== null ? end - start + 1 : 1;
       for (let i = 0; i < count; i++) {
         const number = start === null ? null : start + i;
         const label = isSetup
@@ -689,6 +839,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
           unverifiable: rowUnverifiable,
           source: line.s,
           copyOf: i > 0 ? rows[rows.length - i]?.key : undefined,
+          only: perSize ? perSize.map((l) => i < l) : undefined,
         });
       }
     } catch (e) {
@@ -714,14 +865,14 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
     ops.some((op) =>
       op.t === "st" || op.t === "co" ? badSize(op.n)
         : op.t === "bo" ? op.n !== "all" && badSize(op.n)
-          : op.t === "toEnd" ? badSize(op.leave)
+          : op.t === "toEnd" || op.t === "toMarker" ? badSize(op.leave)
             : op.t === "rep" ? badSize(op.times) || checkOps(op.body)
-              : op.t === "repEnd" ? badSize(op.leave) || checkOps(op.body)
+              : op.t === "repEnd" || op.t === "repMarker" ? badSize(op.leave) || checkOps(op.body)
                 : false,
     );
   const goodRows: Row[] = [];
   for (const r of rows) {
-    if (checkOps(r.ops) || badSize(r.declared)) {
+    if (checkOps(r.ops) || badSize(r.declared) || (r.only && r.only.length !== 1 && r.only.length !== nSizes)) {
       if (!unread.some((u) => u.line === r.line)) {
         unread.push({ line: r.line, text: r.source, reason: `Expected ${nSizes} sizes in every size group` });
       }

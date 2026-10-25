@@ -22,7 +22,7 @@ export function ShapePreview({ program, result, selectedKey, onSelect, height = 
   const bars = useMemo(() => {
     return result.rows
       .map((r, i) => ({ r, row: program.rows[i], i }))
-      .filter(({ row }) => row.ops.some((o) => o.t !== "bo") || row.unverifiable);
+      .filter(({ row, r }) => r.status !== "skipped" && (row.ops.some((o) => o.t !== "bo") || row.unverifiable || row.until));
   }, [program, result]);
 
   const max = Math.max(1, ...result.rows.map((r) => Math.max(r.after, r.before)));

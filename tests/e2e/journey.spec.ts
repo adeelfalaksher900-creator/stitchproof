@@ -118,3 +118,29 @@ test("a visitor's own AI key is saved in the browser and sent with AI readings",
   await expect(page.getByText(/couldn't use your key/)).toBeVisible();
   expect(sent).toBe("AIzaTEST_key-0123456789abcdef");
 });
+
+test("a published-style hat with markers and a sizes-only section is read offline", async ({ page }) => {
+  const hat = `Title: Marker Crown Hat
+Sizes: Child (Adult S, Adult L)
+CO 80 (88, 96) sts. Join to work in the rnd.
+Rnds 1–6: *K1, p1; rep from * to end.
+Adult S and Adult L sizes only:
+Next rnd: *K9 (10), k2tog; rep from * to end. (80 (88) sts)
+All sizes:
+Next rnd: *K10 (10, 11), pm; rep from * to end.
+Next rnd: *K to 2 sts before m, k2tog, sm; rep from * to end. (72 (72, 80) sts)
+Next rnd: Knit.
+Rep last 2 rnds 2 (2, 3) more times. (56 sts)`;
+  await page.goto("/proof");
+  await page.getByRole("button", { name: /Offline/ }).click();
+  await page.getByRole("textbox", { name: "Knitting pattern" }).fill(hat);
+  await page.getByRole("button", { name: /Proof pattern/ }).click();
+  await expect(page.getByText("Proven", { exact: true })).toBeVisible();
+  // The Child size doesn't work the two Adult rows, so its list skips them.
+  const rows = page.getByRole("list", { name: "Rows in size Child" });
+  await expect(rows.getByText(/K9 \(10\), k2tog/)).toHaveCount(0);
+  await page.getByRole("link", { name: /Start knitting/ }).click();
+  for (let i = 0; i < 7; i++) await page.getByRole("button", { name: /Next row/ }).click();
+  await expect(page.locator("article").getByText("Rnd 7", { exact: true })).toBeVisible();
+  await expect(page.locator("article").getByText(/knit 10, place a marker\] to the end — that.s 8 times/)).toBeVisible();
+});
