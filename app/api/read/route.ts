@@ -15,20 +15,23 @@ interface Candidate {
 }
 
 /**
- * Models to try, in order. A Gemini key (free tier) is used first when set;
- * otherwise Vercel AI Gateway, which authenticates with the deployment's OIDC token.
+ * Models to try, in order: the visitor's own key (from the "AI key" box), then the site's Gemini key
+ * (free tier), then Vercel AI Gateway when it has been turned on with a key or a chosen model.
  */
 function candidates(userKey: string | null): Candidate[] {
   const list: Candidate[] = [];
-  const geminiId = process.env.GEMINI_MODEL || "gemini-flash-latest";
-  // A visitor's own key (from the "AI key" box) goes first; it is used for this request only, never stored or logged.
-  if (userKey) list.push({ label: `google/${geminiId}`, model: createGoogleGenerativeAI({ apiKey: userKey })(geminiId) });
-  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    list.push({ label: `google/${geminiId}`, model: google(geminiId) });
+  // Copying notation needs no deep reasoning; the lite model answers in seconds.
+  const ids = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : ["gemini-flash-lite-latest", "gemini-flash-latest"];
+  // A visitor's own key is used for this request only, never stored or logged.
+  if (userKey) {
+    const own = createGoogleGenerativeAI({ apiKey: userKey });
+    for (const id of ids) list.push({ label: `google/${id}`, model: own(id) });
   }
-  if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL) {
-    const ids = [process.env.STITCHPROOF_MODEL, "anthropic/claude-haiku-5.5", "anthropic/claude-haiku-4.5"];
-    for (const id of ids) {
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    for (const id of ids) list.push({ label: `google/${id}`, model: google(id) });
+  }
+  if (process.env.AI_GATEWAY_API_KEY || process.env.STITCHPROOF_MODEL) {
+    for (const id of [process.env.STITCHPROOF_MODEL, "anthropic/claude-haiku-4.5"]) {
       if (id && !list.some((c) => c.label === id)) list.push({ label: id, model: id });
     }
   }
@@ -73,8 +76,11 @@ export async function POST(req: Request) {
     return Response.json({ error: "The AI reader isn't configured here." }, { status: 503 });
   }
 
+  // Stay inside the function's 60 s limit even when a model is slow.
+  const deadline = AbortSignal.timeout(52_000);
   let lastError = "";
   for (const { label, model } of models) {
+    if (deadline.aborted) break;
     try {
       const result = await aiRead(parsed.data.text, async ({ system, prompt }) => {
         const { text } = await generateText({
@@ -82,8 +88,9 @@ export async function POST(req: Request) {
           system,
           prompt,
           temperature: 0,
+          reasoning: "none",
           maxOutputTokens: 6000,
-          abortSignal: AbortSignal.timeout(40_000),
+          abortSignal: AbortSignal.any([deadline, AbortSignal.timeout(25_000)]),
         });
         return text;
       });
