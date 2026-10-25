@@ -165,7 +165,14 @@ Planted typos only go so far, so we also pasted eight free hat patterns from [Pu
 
 Rows worked to a length ("until piece measures 6 in") are marked *can't verify* in every pattern; that's expected, not a failure.
 
-We also tried a pattern a chatbot wrote (a houndstooth scarf a knitting blog published in 2023 to test ChatGPT). Its counts add up. Whether its stitches make the fabric it promises is something counting can't judge: Stitchproof checks that a pattern can be knit as written, not that it looks right.
+## Tested on patterns a chatbot wrote
+
+On October 25, 2026 we asked Gemini (in the Gemini app) for "a knitting pattern for a 2x2 ribbed hat in three sizes (Baby, Child, Adult) to sell as a PDF", with stitch counts after every decrease round, and pasted its answer into the live site unchanged, in Auto mode.
+
+- **Gemini 3.5 Flash-Lite** wrote two instructions that can't be knitted, and Stitchproof flagged both: the set-up round says to work "[K2, P2] repeat (3, 3.5, 4) times" (a repeat can't be worked half-way), and the last round says "12 sts decreased" when "[K2tog, K2tog]" on 36 stitches decreases 18. In three live runs all three flagged both; one run also raised two false errata in the Baby size, where the AI reader misread which sizes skip a round. The AI reading is shown on the page, so it can be checked.
+- **Gemini 3.1 Pro** wrote a three-size beanie whose counts add up in every size. Running it exposed a Stitchproof bug: a dash in a stated count ("– (8, 16) sts") was read as zero stitches and raised two false errata. It now means "this size doesn't say", with a test.
+
+We also tried a pattern a chatbot wrote in 2023 (a houndstooth scarf a knitting blog published to test ChatGPT). Its counts add up. Whether its stitches make the fabric it promises is something counting can't judge: Stitchproof checks that a pattern can be knit as written, not that it looks right.
 
 ## Tests
 
@@ -196,7 +203,8 @@ Import the repository into Vercel (framework: Next.js) and add `GOOGLE_GENERATIV
 | `Rep last 2 rnds until 16 (20) sts rem.` | repeats until a count — checked to land exactly on it |
 | `Adult S and Adult L sizes only:` … `All sizes:` | sections only some sizes work |
 | `Dec rnd:` / `Inc row:` / `Set-Up Round:` / `With smaller needle, CO 88 sts.` / `knit 2 together (k2tog)` | common published phrasing |
-| `[k2tog, sm] 6 times. [6 stitches decreased]` | stated increases and decreases, checked too |
+| `[k2tog, sm] 6 times. [6 stitches decreased]` / `[12 sts decreased] (60 sts)` | stated increases and decreases, checked too |
+| `[k2, p2] 3 (3.5, 4) times` | a fractional repeat is flagged: it can't be knitted |
 | `Remove end-of-round marker, k1, replace marker` | moving the start of the round |
 | `Knit 7 rounds.` / `Repeat Round 1 for 4 (6) more rounds.` | plain rows and repeats in words |
 | `(72 (81, 90) sts)` / `— 72 sts` | stated counts |

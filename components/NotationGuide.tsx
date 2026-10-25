@@ -16,6 +16,7 @@ const EXAMPLES: [string, string][] = [
   ["Rep last 2 rnds 3 (4, 5) more times.", "Repeats that differ by size, also “– (1, 2)” and “until 16 sts rem”"],
   ["Large and XL sizes only:   All sizes:", "Sections only some sizes work"],
   ["[k2tog, sm] 6 times. [6 stitches decreased]", "Stated changes are checked too"],
+  ["[k2, p2] 3 (3.5, 4) times", "A half repeat is flagged, never rounded"],
   ["Remove end-of-round marker, k1, replace marker", "Moving the start of the round"],
   ["Knit 7 rounds.   Repeat Round 1 for 4 (6) more rounds.", "Plain rows and repeats in words"],
   ["(72 (81, 90) sts)   — 72 sts", "Stated stitch counts"],

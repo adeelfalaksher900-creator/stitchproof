@@ -145,7 +145,8 @@ export default function Home() {
             <h2 className="text-[30px] leading-tight font-semibold tracking-[-0.03em] sm:text-[36px]">Then we tried real, published patterns.</h2>
             <p className="mt-3 text-[15.5px] leading-relaxed text-ink-2">
               Eight free hat patterns from Purl Soho, pasted exactly as published: 38 sizes in all, with stitch markers, sizes-only sections and
-              repeat counts that differ by size. Stitchproof read every line offline, with no AI.
+              repeat counts that differ by size. Stitchproof read every line offline, with no AI. Then we asked a chatbot to write a hat
+              pattern to sell, and pasted its answer as it came.
             </p>
           </div>
           <div className="space-y-4">
@@ -164,6 +165,13 @@ export default function Home() {
                 in the comments in February 2025.
               </p>
               <a className="mt-2 inline-block text-[13px] text-accent underline-offset-2 hover:underline" href="https://www.purlsoho.com/create/2025/01/25/box-hat/" target="_blank" rel="noreferrer">Box Hat on Purl Soho</a>
+            </div>
+            <div className="rounded-2xl border border-bad/30 bg-bad-soft p-5">
+              <p className="text-[15px] font-semibold tracking-[-0.01em] text-bad">2 impossible instructions in a hat a chatbot wrote.</p>
+              <p className="mt-1 text-[14px] leading-relaxed text-ink-2">
+                Asked for a three-size hat to sell, Gemini 3.5 Flash-Lite wrote &ldquo;repeat (3, 3.5, 4) times&rdquo;, and a last round that
+                &ldquo;decreases 12&rdquo; but really decreases 18. Pasted unchanged, Stitchproof flagged both: AI read the prose, code did the counting.
+              </p>
             </div>
           </div>
         </div>
