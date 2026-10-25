@@ -138,12 +138,53 @@ export default function Home() {
       {/* ---------- Accuracy, measured at build time ---------- */}
       <Accuracy />
 
+      {/* ---------- Real published patterns ---------- */}
+      <section className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 lg:py-20">
+        <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr] lg:gap-16">
+          <div>
+            <h2 className="text-[30px] leading-tight font-semibold tracking-[-0.03em] sm:text-[36px]">Then we tried real, published patterns.</h2>
+            <p className="mt-3 text-[15.5px] leading-relaxed text-ink-2">
+              Eight free hat patterns from Purl Soho, pasted exactly as published: 38 sizes in all, with stitch markers, sizes-only sections and
+              repeat counts that differ by size. Stitchproof read every line offline, with no AI.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-line bg-surface p-5">
+              <p className="text-[15px] font-semibold tracking-[-0.01em]">7 of 8 add up in every size.</p>
+              <p className="mt-1 text-[14px] leading-relaxed text-ink-2">
+                Classic Ribbed, Giving, Simply Hemmed, Rolled Rib, Duet, Happy and &ldquo;If You Knit, You Know&rdquo; hats. Rows worked to a length are marked
+                &ldquo;can&apos;t verify&rdquo;; one decrease round that stops before the end-of-round marker gets a note.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-bad/30 bg-bad-soft p-5">
+              <p className="text-[15px] font-semibold tracking-[-0.01em] text-bad">1 count that can&apos;t work, in the Box Hat.</p>
+              <p className="mt-1 text-[14px] leading-relaxed text-ink-2">
+                In the largest size, &ldquo;repeat last two rounds 12 more times&rdquo; asks for a 13th decrease round when only 1 stitch is left where it needs 2.
+                Eleven more times reaches the stated 36 stitches. Stitchproof suggests exactly that fix; we checked it by hand, and a reader asked about this step
+                in the comments in February 2025.
+              </p>
+              <a className="mt-2 inline-block text-[13px] text-accent underline-offset-2 hover:underline" href="https://www.purlsoho.com/create/2025/01/25/box-hat/" target="_blank" rel="noreferrer">Box Hat on Purl Soho</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ---------- Who it's for ---------- */}
       <section className="mx-auto grid max-w-[1200px] gap-8 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_2fr] lg:gap-16 lg:py-24">
-        <h2 className="text-[30px] leading-tight font-semibold tracking-[-0.03em] sm:text-[36px]">Who it&apos;s for</h2>
+        <div>
+          <h2 className="text-[30px] leading-tight font-semibold tracking-[-0.03em] sm:text-[36px]">Who it&apos;s for</h2>
+          <p className="mt-3 text-[14.5px] leading-relaxed text-ink-2">
+            Ravelry alone lists nearly 1.2 million patterns and added 87,106 in 2022, and it had almost 9 million registered knitters and
+            crocheters by 2020. Most patterns come in several sizes, and every size is its own set of numbers to get right.
+          </p>
+          <p className="mt-2 flex flex-wrap gap-x-4 text-[12.5px]">
+            <a className="text-accent underline-offset-2 hover:underline" href="https://blog.ravelry.com/2022-community-stats/" target="_blank" rel="noreferrer">Ravelry, 2022 stats</a>
+            <a className="text-accent underline-offset-2 hover:underline" href="https://en.wikipedia.org/wiki/Ravelry" target="_blank" rel="noreferrer">Wikipedia</a>
+          </p>
+        </div>
         <dl className="divide-y divide-line border-y border-line">
           {[
-            ["Designers", "Check every size before you publish, and catch the errata your test knitters would have found on row 40. Send them a proof link instead of a spreadsheet."],
+            ["Designers", "Check every size before you publish, and catch the errata your test knitters would have found on row 40. Open your PDF straight in the browser, send testers a proof link instead of a spreadsheet, and download the report for your files."],
             ["Knitters", "Check a pattern before you buy yarn, then knit it one row at a time with the count to expect and each row in plain English."],
             ["Buyers", "Check a pattern before you pay for yarn. If the numbers can\u2019t work, copy a plain-text report with the exact rows and send it to the seller or the marketplace."],
           ].map(([t, d]) => (
@@ -153,6 +194,29 @@ export default function Home() {
             </div>
           ))}
         </dl>
+      </section>
+
+      {/* ---------- How it's different ---------- */}
+      <section className="border-y border-line bg-surface">
+        <div className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 lg:py-20">
+          <h2 className="max-w-2xl text-[30px] leading-tight font-semibold tracking-[-0.03em] sm:text-[36px]">Not another row counter.</h2>
+          <p className="mt-3 max-w-2xl text-[15.5px] leading-relaxed text-ink-2">
+            Knitters already have good tools for keeping their place and for working out a single row. None of them checks that a whole pattern adds up in every size.
+          </p>
+          <dl className="mt-8 grid gap-x-8 gap-y-6 sm:grid-cols-2">
+            {[
+              ["Row-counter apps", "Keep your place in a PDF (KnitCompanion, for example). They trust the pattern's numbers; Stitchproof checks them, then gives you the same row-by-row Knit mode."],
+              ["Stitch calculators", "Space increases for one row you type in. Stitchproof reads every row of the pattern and carries the count from one to the next."],
+              ["Tech editors", "Re-count every size by hand before a pattern is published. Stitchproof does the arithmetic in seconds, so their time goes on judgment, not sums."],
+              ["General chatbots", "Read prose well, but don't keep a running stitch total and tend to tidy up the numbers they copy. Here AI only translates, and code does every count."],
+            ].map(([t, d]) => (
+              <div key={t} className="border-t border-line pt-4">
+                <dt className="text-[16px] font-semibold tracking-[-0.01em]">{t}</dt>
+                <dd className="mt-1 text-[15px] leading-relaxed text-ink-2">{d}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </section>
 
       {/* ---------- CTA ---------- */}
@@ -167,7 +231,8 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-8 text-[12.5px] text-ink-3 sm:px-6">
           <span>Stitchproof · built for Devpost&apos;s Build With AI: Basics</span>
           <span>Sample patterns are original and for demonstration.</span>
-          <a href={REPO_URL} className="ml-auto hover:text-ink" target="_blank" rel="noreferrer">Source · MIT</a>
+          <a href={`${REPO_URL}/issues/new?title=Misread%3A%20&body=Pattern%20line%3A%0A%0AWhat%20Stitchproof%20said%3A%0A%0AWhat%20it%20should%20say%3A`} className="ml-auto hover:text-ink" target="_blank" rel="noreferrer">Report a misread</a>
+          <a href={REPO_URL} className="hover:text-ink" target="_blank" rel="noreferrer">Source · MIT</a>
         </div>
       </footer>
     </div>

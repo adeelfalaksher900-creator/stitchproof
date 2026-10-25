@@ -18,3 +18,9 @@ it("summarises every erratum with its size, knock-on rows, fix and the proof lin
   expect(report).toContain("Likely fix: Change 8 to 7 in Rnd 49 (size Adult L only).");
   expect(report).toContain("See every row: https://example.test/proof#p=abc");
 });
+
+it("doesn't claim every row adds up when some couldn't be counted", () => {
+  const report = proofReport({ title: "Hat", counted: 20, rowsWord: "rounds", sizes: ["One size"], errata: [], unverified: 1, link: "https://example.test/p" });
+  expect(report).toContain("Result: every row that can be counted adds up.");
+  expect(report).toContain("Not counted: 1 row worked to a measurement or with short rows");
+});

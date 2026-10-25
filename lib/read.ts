@@ -1,14 +1,18 @@
+import { SAMPLES } from "./samples";
 import { parsePattern } from "./stitch/parse";
 import { readsOffline } from "./stitch/proof";
 import type { Program } from "./stitch/types";
 
-/** A visitor's own Gemini key, kept only in this browser (see components/AiKey). */
+/**
+ * A visitor's own Gemini key (see components/AiKey). Kept for this tab's session by default,
+ * or on this device if the visitor ticks "Remember"; never sent anywhere but our AI route.
+ */
 export const KEY_STORE = "stitchproof:gemini-key";
 export const KEY_RE = /^[\w-]{20,200}$/;
 
 export function savedKey(): string | null {
   try {
-    const k = localStorage.getItem(KEY_STORE);
+    const k = sessionStorage.getItem(KEY_STORE) ?? localStorage.getItem(KEY_STORE);
     return k && KEY_RE.test(k) ? k : null;
   } catch {
     return null;
@@ -58,6 +62,9 @@ export async function readPattern(
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || typeof data.canonical !== "string") {
+      // A visitor's own key failing is news to them, so it isn't papered over.
+      const saved = key ? null : savedSampleReading(text);
+      if (saved) return saved;
       return {
         program: offline,
         readingText: text,
@@ -69,6 +76,8 @@ export async function readPattern(
     return { program, readingText: data.canonical, readBy: "ai", model: data.model, attempts: data.attempts };
   } catch (e) {
     if ((e as Error)?.name === "AbortError") throw e;
+    const saved = key ? null : savedSampleReading(text);
+    if (saved) return saved;
     return {
       program: offline,
       readingText: text,
@@ -76,4 +85,18 @@ export async function readPattern(
       aiNote: "Couldn't reach the AI reader. Showing what the offline reader could read.",
     };
   }
+}
+
+/** The built-in prose sample keeps working when the live AI can't answer, and says so. */
+function savedSampleReading(text: string): Reading | null {
+  const sample = SAMPLES.find((s) => s.savedReading && s.text.trim() === text.trim());
+  if (!sample?.savedReading) return null;
+  const { canonical, model } = sample.savedReading;
+  return {
+    program: parsePattern(canonical),
+    readingText: canonical,
+    readBy: "ai",
+    model,
+    aiNote: "The live AI reader didn't answer, so this sample shows a reading the same model made earlier. Your own patterns always use the live reader.",
+  };
 }

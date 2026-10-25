@@ -189,3 +189,123 @@ Rep last 2 rnds 3 more times. (92 sts)`);
     expect(p.verdict).toBe("proven");
   });
 });
+
+describe("audit fixes", () => {
+  it("applies a one-size section's single count to that size only", () => {
+    const p = proofText(`Sizes: S (M, L)
+CO 40 (44, 48) sts.
+L size only:
+Row 1: K2tog, k to end. (47 sts)
+All sizes:
+Row 1: Knit. (40 (44, 47) sts)`);
+    expect(p.verdict).toBe("proven");
+  });
+
+  it("reads a size header with a unit after the group", () => {
+    const p = proofText(`Sizes: 32 (36, 40)" chest
+CO 60 (64, 68) sts.
+Row 1: Knit.`);
+    expect(p.program.sizes).toEqual(["32", "36", "40"]);
+    expect(p.verdict).toBe("proven");
+  });
+
+  it("says so when a flat row works to a marker that was never placed", () => {
+    const p = proofText(`CO 20 sts.
+Row 1: K to m, k2tog. (19 sts)`);
+    expect(p.sizes[0].rows[1].messages.map((m) => m.text)).toContain("This row works to a marker, but no marker has been placed.");
+  });
+
+  it("finds rows inside a sizes-only section by number", () => {
+    const p = proofText(`Sizes: S (M)
+CO 20 (24) sts.
+Row 1: Knit.
+M size only:
+Row 2: K2tog, k to end. (23 sts)
+Row 3: Purl.
+Rep rows 2–3 once more. (22 sts)
+All sizes:
+Next row: Knit. (20 (22) sts)`);
+    expect(p.program.unread).toEqual([]);
+    expect(p.verdict).toBe("proven");
+    expect(p.program.rows.at(-1)!.label).toBe("Row 2");
+  });
+});
+
+describe("common published phrasing, read offline", () => {
+  const cases: [string, string, number][] = [
+    ["k2tog around", "CO 10 sts. Join to work in the rnd.\nRnd 1: K2tog around. (5 sts)", 5],
+    ["kfb in each st", "CO 10 sts.\nRow 1: Kfb in each st. (20 sts)", 20],
+    ["k1f&b", "CO 10 sts.\nRow 1: K1f&b, k to end. (11 sts)", 11],
+    ["count after a full stop", "CO 20 sts.\nRow 1: K2tog, k to end. 19 sts rem.", 19],
+    ["count after a semicolon", "CO 20 sts.\nRow 1: K2tog, k to end; 19 sts.", 19],
+    ["closing star", "CO 12 sts.\nRow 1: *K2, p2* rep to end.", 12],
+    ["rib shorthand", "CO 20 sts.\nRows 1-6: K1, p1 rib.", 20],
+    ["established pattern", "CO 20 sts.\nRow 1: *K2, p2; rep from * to end.\nRows 2-10: Work in established pattern.", 20],
+    ["bullets", "CO 10 sts.\n• Row 1: Knit.", 10],
+    ["a row wrapped over two lines", "CO 20 sts. Join to work in the rnd.\nRnd 1: *K2, p2; rep from *\naround.", 20],
+  ];
+  it.each(cases)("%s", (_name, text, final) => {
+    const p = proofText(text);
+    expect(p.program.unread).toEqual([]);
+    expect(p.verdict).toBe("proven");
+    expect(p.sizes[0].finalCount).toBe(final);
+  });
+
+  it("keeps character positions when it joins a wrapped row, so fixes edit the right number", () => {
+    const text = "CO 21 sts. Join to work in the rnd.\nRnd 1: *K2, p2; rep from *\naround.";
+    const p = proofText(text);
+    expect(p.verdict).toBe("issues");
+    const { fixedText } = findErrata(text, p);
+    // 21 stitches take a 3-stitch rib, so the smallest edit is K2 → K1, at the right place in the joined line.
+    expect(fixedText).toBe(text.replace("*K2", "*K1"));
+  });
+});
+
+describe("house-style published patterns (written for these tests)", () => {
+  const beanie = `Small (Medium, Large)
+
+Loosely cast 80 (88, 96) stitches onto circular needles. We used a basic Long Tail Cast On.
+
+Place unique stitch marker and join for working in the round, being careful not to twist the stitches.
+
+Round 1: *K1, p1, repeat from * to end of round.
+
+Repeat Round 1 for 4 (6, 6) more rounds.
+
+With Main Color, continue knitting every round until piece measures 7 (7½, 8) inches from cast-on edge.
+
+NOTE: Change to double pointed needles when necessary.
+
+Set-Up Round: Remove unique end-of-round marker, k1, replace marker for new end-of-round, *k20 (22, 24), place marker (pm), repeat from * to end of round, omitting final stitch marker which is end-of-round marker. [4 stitch markers placed, including unique end-of-round marker]
+
+Decrease Round: [Slip slip knit (ssk) knit to two stitches before next marker, knit 2 together (k2tog), slip marker] 4 times. [8 stitches decreased]
+
+Next Round: Knit to end of round, slipping markers as you come to them.
+
+Repeat last two rounds one (2, 3) more time(s). [64 (64, 64) stitches remain]
+
+Cut yarn and thread tail through remaining stitches.`;
+
+  it("reads every line and proves every count", () => {
+    const p = proofText(beanie);
+    expect(p.program.unread).toEqual([]);
+    expect(p.program.sizes).toEqual(["Small", "Medium", "Large"]);
+    expect(p.issueCount).toBe(0);
+    // Worked to a length, so the verdict stays honest.
+    expect(p.verdict).toBe("partial");
+  });
+
+  it("checks a stated decrease against the instructions", () => {
+    const p = proofText(beanie.replace("[8 stitches decreased]", "[6 stitches decreased]"));
+    expect(p.issueCount).toBeGreaterThan(0);
+    expect(p.sizes[0].rows.find((r) => r.status === "issue")!.messages[0].text).toBe("This row decreases by 8; the pattern says it decreases by 6.");
+  });
+
+  it("finds a repeat count that's one too many for the largest size, and fixes it", () => {
+    const broken = beanie.replace("one (2, 3) more time(s)", "one (2, 4) more time(s)");
+    const p = proofText(broken);
+    expect(p.sizes[2].issues).toBeGreaterThan(0);
+    const { errata } = findErrata(broken, p);
+    expect(errata[0].fix?.description).toBe("Change 4 to 3 in the repeat count (size Large only).");
+  });
+});

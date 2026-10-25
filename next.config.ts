@@ -7,7 +7,9 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
-// Only same-origin requests are allowed, so even injected script couldn't send a saved AI key anywhere.
+// Scripts, fonts and network requests are limited to this site, so a script can't quietly post data elsewhere.
+// Next.js needs inline scripts without a nonce setup, so this isn't a full XSS defence: no user text is
+// ever rendered as HTML, and a visitor's AI key is kept for the session unless they choose otherwise.
 // Dev mode needs eval for hot reload, so the policy applies to production builds.
 const csp = [
   "default-src 'self'",

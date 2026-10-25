@@ -45,7 +45,8 @@ function candidates(userKey: string | null): Candidate[] {
   return list;
 }
 
-// Best-effort, per-instance rate limit: 10 readings per minute per address.
+// The shared limit is a Vercel Firewall rule (10 POSTs a minute per IP on /api/read).
+// This per-instance copy is a second line for local runs and anything the firewall lets through.
 const WINDOW_MS = 60_000;
 const LIMIT = 10;
 const hits = new Map<string, number[]>();
@@ -55,11 +56,26 @@ function limited(ip: string): boolean {
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   recent.push(now);
   hits.set(ip, recent);
-  if (hits.size > 5000) hits.clear();
+  // Drop addresses that have gone quiet, rather than resetting everyone at once.
+  if (hits.size > 5000) for (const [k, v] of hits) if (now - v[v.length - 1] >= WINDOW_MS) hits.delete(k);
   return recent.length > LIMIT;
 }
 
+/** Browsers send Origin on every POST; one from another site means someone else's page is calling. */
+function foreignOrigin(req: Request): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return false;
+  try {
+    return new URL(origin).host !== (req.headers.get("x-forwarded-host") ?? req.headers.get("host"));
+  } catch {
+    return true;
+  }
+}
+
 export async function POST(req: Request) {
+  if (foreignOrigin(req)) {
+    return Response.json({ error: "The AI reader only answers Stitchproof's own pages." }, { status: 403 });
+  }
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   if (limited(ip)) {
     return Response.json({ error: "Too many readings in a minute. Try again shortly." }, { status: 429 });

@@ -23,7 +23,7 @@ PRD ref: `prd.md > The Core Journey`.
 
 1. Knitter pastes text in **PatternEditor** → presses Proof.
 2. `lib/stitch/parse.ts` reads every line. If all lines are understood → step 4.
-3. Otherwise the browser POSTs the text to `/api/read`. The route asks the model (via Vercel AI Gateway) for canonical notation, parses it with the same `parse.ts`; on parse errors it asks the model once more with the errors listed; returns the canonical text + which model was used.
+3. Otherwise the browser POSTs the text to `/api/read`. The route checks the request came from Stitchproof's own pages, then asks the model (Google Gemini; OpenRouter if Gemini fails) for canonical notation, parses it with the same `parse.ts`; on parse errors it asks the model once more with the errors listed; returns the canonical text + which model was used.
 4. `lib/stitch/simulate.ts` runs the program for every size → per-row results.
 5. `lib/stitch/fixes.ts` searches fixes for each issue.
 6. **ProofView** renders summary, size switcher, **ShapePreview**, **RowList**, **IssueCard**s. The proof and text are saved by `lib/store.ts` to localStorage.
@@ -32,8 +32,11 @@ PRD ref: `prd.md > The Core Journey`.
 ## Stack
 - **Next.js 16 (App Router) + React 19 + TypeScript** — one project for pages and the AI route; first-class on Vercel. https://nextjs.org/docs
 - **Tailwind CSS 4** for layout utilities, with design tokens as CSS variables. https://tailwindcss.com/docs
-- **AI SDK (`ai` v7) `generateText`** with a gateway model string. https://ai-sdk.dev/docs
-- **Vercel AI Gateway** — on Vercel, authenticates with the deployment's OIDC token, so no API key is stored anywhere. Model: `anthropic/claude-haiku-5.5` by default, overridable with `STITCHPROOF_MODEL`. https://vercel.com/docs/ai-gateway
+- **AI SDK (`ai` v7) `generateText`** with the Google provider (`@ai-sdk/google`) and an OpenAI-compatible provider for OpenRouter (`@ai-sdk/openai-compatible`). https://ai-sdk.dev/docs
+- **Google Gemini** — `gemini-flash-lite-latest` with reasoning off, then `gemini-flash-latest` (override with `GEMINI_MODEL`). Key: `GOOGLE_GENERATIVE_AI_API_KEY`, a Vercel sensitive variable; a visitor may paste their own Gemini key instead. https://ai.google.dev
+- **OpenRouter** (fallback) — `google/gemini-2.5-flash-lite`, then `openrouter/free` (override with `OPENROUTER_MODEL`). Key: `OPENROUTER_API_KEY`. https://openrouter.ai/docs
+- **Vercel AI Gateway** (optional, off in production) — used only when `AI_GATEWAY_API_KEY` or `STITCHPROOF_MODEL` is set. https://vercel.com/docs/ai-gateway
+- **pdf.js** (`pdfjs-dist`) — reads the text of a pattern PDF in the browser. https://mozilla.github.io/pdf.js/
 - **Zod 4** for validating the API request/response. https://zod.dev
 - **Motion** (`motion/react`) for the few functional animations. https://motion.dev
 - **Vitest** for unit tests of the reader, counter and fixer; **Playwright** for end-to-end browser tests. https://vitest.dev , https://playwright.dev
@@ -41,8 +44,8 @@ PRD ref: `prd.md > The Core Journey`.
 ## Where It Runs and How Someone Tries It
 - Browser app; Node 22.
 - Local: `npm install`, `npm run dev`, open http://localhost:3000. Without AI credentials the app runs in offline-reader mode (the clean and flawed samples work fully; the prose sample shows the AI-unavailable fallback).
-- Local AI: set `AI_GATEWAY_API_KEY` in `.env.local` (see `.env.example`).
-- Deployment (chosen, for judges): Vercel project `stitchproof`; production URL recorded in README. AI uses OIDC automatically.
+- Local AI: set `GOOGLE_GENERATIVE_AI_API_KEY` and/or `OPENROUTER_API_KEY` in `.env.local` (see `.env.example`).
+- Deployment (chosen, for judges): Vercel project `stitchproof`; production URL recorded in README. Both AI keys are sensitive environment variables; a Vercel Firewall rule limits `/api/read` to 10 requests a minute per IP.
 - Demo recording: production URL, flawed-beanie sample → proof → apply fixes → Knit mode → reload.
 
 ## Look and Feel
@@ -132,11 +135,13 @@ Program and results are derived, never stored; only text + place are saved.
 ```
 
 ## External Services and Dependencies
-- **Vercel AI Gateway** — `generateText({ model: 'anthropic/claude-haiku-5.5', system, prompt, maxOutputTokens: 4000, temperature: 0 })`. Auth: OIDC on Vercel (`VERCEL_OIDC_TOKEN`), or `AI_GATEWAY_API_KEY` locally. Cost ≈ $0.10 / $0.50 per million input/output tokens; a typical pattern is < 3k tokens round-trip (≈ $0.002). Free monthly gateway credit covers the judging period. Docs: https://vercel.com/docs/ai-gateway
+- **Google Gemini** — `generateText({ model: google('gemini-flash-lite-latest'), system, prompt, maxOutputTokens: 4000, temperature: 0 })`, 25 s timeout per call. The free tier covers the judging period; a typical pattern is under 3k tokens round-trip. Docs: https://ai.google.dev/gemini-api/docs
+- **OpenRouter** — the same call through `createOpenAICompatible({ baseURL: 'https://openrouter.ai/api/v1' })` when Gemini fails or hits its quota. Docs: https://openrouter.ai/docs
+- **Vercel AI Gateway** — optional third fallback (`anthropic/claude-haiku-4.5`), only when configured. Docs: https://vercel.com/docs/ai-gateway
 - **Vercel hosting** (Hobby). No database.
 
 ## Important Failure Modes
-- **AI unavailable / out of credit / slow** → route returns 503; UI shows offline reading with unread lines marked and a clear banner.
+- **AI unavailable / out of credit / slow** → the next provider is tried; if all fail the route returns 503 and the UI shows the offline reading with unread lines marked and a clear banner. For the prose sample only, the UI shows a reading the same model made earlier, labelled as such.
 - **AI returns malformed notation** → parser errors fed back once; if still malformed, unparsed lines are shown as "couldn't read", never guessed.
 - **Ambiguous pattern semantics** (short rows, "work even until 6 in") → row marked *can't verify* instead of guessed.
 - **localStorage blocked** → app works; saving silently disabled with a small note.
@@ -144,9 +149,16 @@ Program and results are derived, never stored; only text + place are saved.
 ## What Was Simplified and Why
 - **Browser storage** instead of accounts + database — judges try it instantly; a full version would add Supabase auth and sync.
 - **Canonical text** as the AI's output instead of JSON — the same parser checks both paths and the knitter can read it.
-- **In-memory rate limit** instead of a shared store — adequate for a demo; a full version would use a KV store.
+- **Firewall plus in-memory rate limit** instead of a shared store — the Vercel Firewall rule is shared across instances; the in-memory one is a backstop.
 
 ## Decisions and Open Issues
-- Agent decisions (learner delegated): Next.js on Vercel; AI Gateway via OIDC (no stored keys); AI only when the offline reader fails; local storage only.
+- Agent decisions (learner delegated): Next.js on Vercel; AI only when the offline reader fails; local storage only. The plan was Vercel AI Gateway via OIDC; see Revisions.
 - Genuine uncertainty: *will a small model translate prose patterns reliably into strict notation?* Investigation during the build: run the prose sample through the deployed route several times and check the parser accepts the output; the repair retry is the planned mitigation.
 - Open: none blocking.
+
+## Revisions during the build
+- **AI provider.** Vercel AI Gateway wouldn't serve requests without a card on file, so the route uses a free Google Gemini key first and OpenRouter as the fallback; the gateway stays as an optional third option.
+- **Stitch markers and per-size row counts.** Published patterns lean on markers ("k to 2 sts before m") and repeat counts that differ by size, so the counter now carries marker positions row to row and reads per-size repeat counts and sizes-only sections.
+- **Published phrasing.** After running eight free Purl Soho hat patterns, the reader learned their phrasing: set-up rounds, glossed stitches ("knit 2 together (k2tog)"), moving the end-of-round marker, stated decreases ("[6 stitches decreased]"), "Knit 7 rounds", wrapped lines.
+- **PDF import and report export.** Knitters receive patterns as PDFs, so a PDF's text is read in the browser (pdf.js); the proof report can be copied or downloaded.
+- **API protection.** Same-origin check, Vercel Firewall rate limit, and visitor keys kept for the session unless the visitor chooses to remember them.

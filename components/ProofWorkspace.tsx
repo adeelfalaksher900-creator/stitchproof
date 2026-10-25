@@ -13,6 +13,7 @@ import { proofReport } from "@/lib/report";
 import { load, newId, save, titleOf } from "@/lib/store";
 import { Alert, Arrow, Check, Doc, Link2, Lock, Needles, Question, Wand } from "./icons";
 import { NotationGuide } from "./NotationGuide";
+import { REPO_URL } from "./TopBar";
 import { AiKey } from "./AiKey";
 import { PatternEditor, type EditorHandle, type LineMark } from "./PatternEditor";
 import { RowList } from "./RowList";
@@ -161,8 +162,10 @@ export function ProofWorkspace() {
     if (!proof || !reading || reading.readBy !== "offline" || stale) return m;
     proof.program.rows.forEach((row, i) => {
       const bad = proof.sizes.some((s) => s.rows[i]?.status === "issue");
+      const unsure = proof.sizes.some((s) => s.rows[i]?.status === "unverifiable" || s.rows[i]?.status === "warn");
       const cur = m.get(row.line);
       if (bad) m.set(row.line, "issue");
+      else if (unsure && cur !== "issue") m.set(row.line, "warn");
       else if (!cur) m.set(row.line, "ok");
     });
     proof.program.unread.forEach((u) => m.set(u.line, "unread"));
@@ -196,6 +199,24 @@ export function ProofWorkspace() {
       errata.fixedText,
       `Applied ${n} fix${n === 1 ? "" : "es"}.${reading.readBy === "ai" ? " The editor now shows Stitchproof's notation of your pattern." : ""}`,
     );
+  };
+
+  const openFile = async (file: File) => {
+    setError(null);
+    if (file.size > 20 * 1024 * 1024) return setError("That file is over 20 MB. Copy the pattern text in instead.");
+    try {
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      const { text: t, pages } = isPdf ? await (await import("@/lib/pdf")).pdfText(file) : { text: await file.text(), pages: 0 };
+      if (!t.trim()) return setError(isPdf ? "No text in that PDF. It may be scanned pages; copy the text in instead." : "That file is empty.");
+      setText(t);
+      setPatternId(null);
+      setProof(null);
+      setReading(null);
+      setStage("idle");
+      setNotice(`Read ${file.name}${pages ? ` (${pages} ${pages === 1 ? "page" : "pages"})` : ""} in your browser; nothing was uploaded. Check the text, then press Proof pattern.`);
+    } catch {
+      setError("Couldn't read that file. Copy the pattern text in instead.");
+    }
   };
 
   const loadSample = (id: string) => {
@@ -259,6 +280,19 @@ export function ProofWorkspace() {
               placeholder={"Paste a knitting pattern…\n\nCO 44 sts.\nRows 1–4: Knit.\nRow 5 (RS): K3, *p2, k2; rep from * to last 5 sts, p2, k3."}
             />
             <div className="flex items-center gap-3 border-t border-line px-4 py-3">
+              <label className="btn btn-ghost btn-sm cursor-pointer focus-within:outline-2 focus-within:outline-accent" title="Open a pattern PDF or text file. It's read in your browser and never uploaded.">
+                <input
+                  type="file"
+                  accept="application/pdf,.pdf,text/plain,.txt,.md"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) void openFile(f);
+                  }}
+                />
+                <Doc size={14} /> Open PDF
+              </label>
               <span className={`text-[12px] tnum ${text.length > MAX_CHARS ? "text-bad" : "text-ink-3"}`}>
                 {text.length.toLocaleString()} / {MAX_CHARS.toLocaleString()}
               </span>
@@ -315,23 +349,33 @@ export function ProofWorkspace() {
                     setError("Couldn't copy the link. Your browser may block clipboard access on this page.");
                   }
                 }}
-                onReport={async () => {
+                onReport={async (how) => {
                   try {
                     const link = await shareUrl(reading.readBy === "ai" ? reading.readingText : proofedText);
                     const rows = proof.program.rows;
-                    await navigator.clipboard.writeText(
-                      proofReport({
-                        title: proof.program.title ?? titleOf(proofedText),
-                        counted: rows.filter((r) => r.number !== null).length,
-                        rowsWord: rows.some((r) => r.round) ? "rounds" : "rows",
-                        sizes: proof.program.sizes,
-                        errata: errata?.list ?? [],
-                        link,
-                      }),
-                    );
+                    const title = proof.program.title ?? titleOf(proofedText);
+                    const text = proofReport({
+                      title,
+                      counted: rows.filter((r) => r.number !== null).length,
+                      rowsWord: rows.some((r) => r.round) ? "rounds" : "rows",
+                      sizes: proof.program.sizes,
+                      errata: errata?.list ?? [],
+                      unverified: Math.max(...proof.sizes.map((s) => s.unverifiable)),
+                      link,
+                    });
+                    if (how === "download") {
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
+                      a.download = `${title.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "pattern"}-stitchproof-report.md`;
+                      a.click();
+                      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                      setNotice("Report downloaded. It lists every finding with its row and size, and links to this proof.");
+                      return;
+                    }
+                    await navigator.clipboard.writeText(text);
                     setNotice("Report copied. Paste it into a message to the seller, a marketplace report or your test knitters. It links to this proof.");
                   } catch {
-                    setError("Couldn't copy the report. Your browser may block clipboard access on this page.");
+                    setError("Couldn't make the report. Your browser may block clipboard access on this page.");
                   }
                 }}
                 patternId={patternId}
@@ -469,7 +513,7 @@ function Summary({
   errata: { list: Erratum[]; fixedText: string | null } | null;
   onApplyAll: () => void;
   onShare: () => void;
-  onReport: () => void;
+  onReport: (how: "copy" | "download") => void;
   patternId: string | null;
   onSelect: (k: string | null) => void;
   selectedKey: string | null;
@@ -477,7 +521,8 @@ function Summary({
   const { program, verdict } = proof;
   const size = proof.sizes[sizeIndex];
   const rowsWord = program.rows.some((r) => r.round) ? "rounds" : "rows";
-  const counted = program.rows.filter((r) => r.number !== null).length;
+  // Rows this size works ("Large only" rows and extra repeats for other sizes don't count).
+  const counted = program.rows.filter((r, i) => r.number !== null && size?.rows[i]?.status !== "skipped").length;
   const nSizes = program.sizes.length;
   const fixable = errata?.list.filter((e) => e.fix).length ?? 0;
 
@@ -508,7 +553,7 @@ function Summary({
               <dt className="inline">Read </dt>
               <dd className="inline font-medium text-ink-2">
                 {reading.readBy === "ai"
-                  ? `with AI · ${reading.model?.split("/").pop()} · checked by the parser`
+                  ? `${reading.aiNote ? "saved AI reading" : "with AI"} · ${reading.model?.split("/").pop()} · checked by the parser`
                   : reading.aiNote
                     ? "offline · AI reader not used"
                     : "offline · no AI needed"}
@@ -551,10 +596,15 @@ function Summary({
                 <Link2 size={16} /> Share proof
               </button>
             )}
-            {verdict === "issues" && errata && (
-              <button type="button" className="btn btn-ghost" onClick={onReport} title="Copy a plain-text summary of the errata, with a link to this proof">
-                <Doc size={16} /> Copy report
-              </button>
+            {(verdict === "proven" || verdict === "partial" || (verdict === "issues" && errata)) && counted > 0 && (
+              <>
+                <button type="button" className="btn btn-ghost" onClick={() => onReport("copy")} title="Copy a plain-text summary of the findings, with a link to this proof">
+                  <Doc size={16} /> Copy report
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => onReport("download")} title="Download the same report as a Markdown file">
+                  <Doc size={16} /> Download
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -680,7 +730,15 @@ function UnreadList({ reading }: { reading: Reading }) {
         <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
           {unread.length} {unread.length === 1 ? "line" : "lines"} not counted
         </h2>
-        <span className="ml-auto">
+        <span className="ml-auto flex items-center gap-3">
+          <a
+            className="text-[12px] font-medium text-accent hover:underline"
+            href={`${REPO_URL}/issues/new?title=${encodeURIComponent("Misread: " + (unread[0]?.text ?? "").slice(0, 60))}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Report a misread
+          </a>
           <NotationGuide label="What it reads" />
         </span>
       </div>

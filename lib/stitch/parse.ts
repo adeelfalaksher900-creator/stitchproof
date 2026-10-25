@@ -1,5 +1,5 @@
 import { ALIASES, STITCHES } from "./stitches";
-import type { Op, Program, Row, Side, SizedRef, Span, Unread } from "./types";
+import type { Op, Program, Row, Side, SizedRef, Span, StitchChange, Unread } from "./types";
 
 /**
  * The offline reader: turns standard knitting notation into a stitch program.
@@ -86,6 +86,22 @@ function readCount(src: Slice): { ref: SizedRef; length: number } | null {
   if (sized) return sized;
   const w = /^([a-z]+)/i.exec(src.s);
   if (w && WORD_NUMBERS[w[1].toLowerCase()] !== undefined) {
+    // "one (2, 3, 4) more times": a word for the first size, digits for the rest.
+    const g = /^\s*\(([\s\d,–—-]*)\)/.exec(src.s.slice(w[1].length));
+    if (g) {
+      const values = [WORD_NUMBERS[w[1].toLowerCase()]];
+      const spans: (Span | undefined)[] = [undefined];
+      let pos = w[1].length + g[0].indexOf("(") + 1;
+      for (const part of g[1].split(",")) {
+        const m = /\d+|[–—-]/.exec(part);
+        if (!m) return null;
+        const dash = !/\d/.test(m[0]);
+        values.push(dash ? 0 : num(m[0]));
+        spans.push(dash ? undefined : { start: src.at + pos + m.index, end: src.at + pos + m.index + m[0].length });
+        pos += part.length + 1;
+      }
+      return { ref: { values, spans }, length: w[1].length + g[0].length };
+    }
     return { ref: { values: [WORD_NUMBERS[w[1].toLowerCase()]] }, length: w[1].length };
   }
   return null;
@@ -140,7 +156,7 @@ function readMarkerSpec(t: Slice): SizedRef | null {
   if (TO_MARKER_RE.test(s)) return zero();
   const b = BEFORE_MARKER_RE.exec(s);
   if (!b) return null;
-  const c = readSized(slice(t, b[0].length));
+  const c = readCount(slice(t, b[0].length));
   if (!c) return null;
   return BEFORE_TAIL_RE.test(s.slice(b[0].length + c.length).trim()) ? c.ref : null;
 }
@@ -184,7 +200,7 @@ function addOne(ref: SizedRef): SizedRef {
   return { values: ref.values.map((v) => v + 1), spans: ref.spans, offset: 1 };
 }
 
-const NOTE_RE = /^(turn|join( to work in the (rnd|round))?|being careful not to twist)$/i;
+const NOTE_RE = /^(turn|join( to work in the (rnd|round))?|being careful not to twist|omitting (?:the )?(?:final|last) (?:stitch )?marker.*|slipping (?:the )?markers?(?: as you (?:come to|reach|get to) them)?|(?:with|using|change to|switch to) (?:the )?(?:[a-z]+ ){0,2}(?:yarn|colou?r(?: [a-z])?|mc|cc|main colou?r|contrast colou?r))$/i;
 const PM_RE = /^(pm|place (a |new |unique |beginning of (rnd|round) )?(st |stitch )?marker|pm for (beg|beginning|end) of (rnd|round)|place marker for (beg|beginning|end) of (rnd|round)|replace marker( for new (beg|beginning|end) of (rnd|round))?)$/i;
 const SM_RE = /^(sm|slip (the )?marker|sl m|slm)$/i;
 const RM_RE = /^(rm|remove (the |unique |beginning of (rnd|round) |end of (rnd|round) )?marker|remove (unique )?(beg|end)-of-(rnd|round) marker)$/i;
@@ -196,9 +212,18 @@ function readItem(src: Slice): Op {
   const lower = t.s.toLowerCase().replace(/’/g, "'");
 
   if (NOTE_RE.test(lower)) return { t: "note", text: t.s };
-  if (PM_RE.test(lower)) return { t: "marker", kind: "pm" };
-  if (SM_RE.test(lower)) return { t: "marker", kind: "sm" };
-  if (RM_RE.test(lower)) return { t: "marker", kind: "rm" };
+  // "knit 2 together (k2tog)", "place marker (pm)": the abbreviation in brackets says what it is.
+  const gloss = /^(.+?)\s*\(\s*([a-z0-9]+)\s*\)$/.exec(lower);
+  if (gloss && (codeOf(gloss[2]) || /^(pm|sm|rm)$/.test(gloss[2]))) {
+    const g = gloss[2];
+    if (g === "pm" || g === "sm" || g === "rm") return { t: "marker", kind: g };
+    return { t: "st", code: codeOf(g)!, n: one() };
+  }
+  // "pm (place marker)", "end-of-round marker": the gloss and hyphens don't change the meaning.
+  const markerWords = lower.replace(/\s*\((?:place|slip|remove)(?: a)? marker\)/g, "").replace(/-of-/g, " of ");
+  if (PM_RE.test(markerWords)) return { t: "marker", kind: "pm" };
+  if (SM_RE.test(markerWords)) return { t: "marker", kind: "sm" };
+  if (RM_RE.test(markerWords)) return { t: "marker", kind: "rm" };
 
   // Cast on / bind off inside a row.
   const co = /^(co|cast on)\s+/.exec(lower);
@@ -223,6 +248,24 @@ function readItem(src: Slice): Op {
   if (whole && (whole[2] !== undefined || /^(knit|purl)$/.test(lower))) {
     const code = whole[1].startsWith("k") ? (whole[1] === "ktbl" ? "ktbl" : "k") : whole[1] === "ptbl" ? "ptbl" : "p";
     return { t: "toEnd", code, leave: zero() };
+  }
+  // "Work in established pattern", "work even", "cont in rib as set": the count carries over.
+  if (/^(?:work|cont(?:inue)?)\s+(?:even|as (?:established|set)|(?:even\s+)?in\s+(?:the\s+)?(?:established\s+)?(?:patt(?:ern)?|rib(?:bing)?|st(?:itch)? patt(?:ern)?)(?:\s+as\s+(?:established|set))?)(?:\s+(?:to end|across|around))?$/.test(lower)) {
+    return { t: "toEnd", code: "patt", leave: zero() };
+  }
+  // "work in pattern to 2 stitches before next marker"
+  const pattTo = /^(?:work|cont(?:inue)?) in (?:the )?(?:established )?(?:patt(?:ern)?|rib(?:bing)?) (to\s.*)$/.exec(lower);
+  if (pattTo) {
+    const leave = readMarkerSpec(slice(t, lower.length - pattTo[1].length));
+    if (leave) return { t: "toMarker", code: "patt", leave };
+    const spec = readRepeatSpec(slice(t, lower.length - pattTo[1].length));
+    if (spec?.kind === "toEnd") return { t: "toEnd", code: "patt", leave: spec.leave };
+  }
+  // "k2tog around", "kfb in each st", "ssk across": that stitch repeated to the end.
+  const each = /^([a-z0-9&-]+)\s+(?:around|across|to (?:the )?end|all around|in(?:to)? (?:each|every) st(?:itch)?(?:\s+(?:to end|around|across))?)$/.exec(lower);
+  if (each) {
+    const code = codeOf(each[1]);
+    if (code) return { t: "repEnd", body: [{ t: "st", code, n: one() }], leave: zero() };
   }
   const toLastOne = /^([a-z0-9-]+?)\s+to (?:the )?last (?:st|stitch)$/.exec(lower);
   if (toLastOne) {
@@ -251,6 +294,12 @@ function readItem(src: Slice): Op {
     }
   }
 
+  // Knitting a hem closed: "slip tip of left needle under purl bump …" picks up, "knit next stitch and picked-up stitch together".
+  if (/^(?:slip|insert|put)\b.*\b(?:purl bump|cast-on edge|cast-on stitch)/.test(lower)) return { t: "note", text: t.s };
+  if (/^knit (?:the )?next st(?:itch)? (?:and|together with) (?:the |its )?picked[- ]up st(?:itch)?(?: together)?$/.test(lower)) return { t: "st", code: "k", n: one() };
+  // "Slip slip knit", spelled out.
+  const spelled = /^slip,?\s+slip,?\s+(knit|purl)$/.exec(lower);
+  if (spelled) return { t: "st", code: spelled[1] === "knit" ? "ssk" : "ssp", n: one() };
   // Words: "knit 2", "purl 3", "slip 1", "knit 2 together".
   const words = lower
     .replace(/^knit (\d+) together$/, "k$1tog")
@@ -290,13 +339,13 @@ function readItem(src: Slice): Op {
     const idx = lower.indexOf(sl[1], 2);
     return { t: "st", code, n: readSized(slice(t, idx))!.ref };
   }
-  const kp = /^([kp])\s*(?=\d)/.exec(lower);
+  const kp = /^([kp])\s*(?=\d)/.exec(lower) ?? /^(k)nit\s+(?=\d)|^(p)url\s+(?=\d)/.exec(lower);
   if (kp) {
     const c = readSized(slice(t, kp[0].length));
     if (c) {
       const tail = lower.slice(kp[0].length + c.length).trim();
       if (tail === "" || /^(sts?|stitches)$/.test(tail)) {
-        return { t: "st", code: kp[1], n: c.ref };
+        return { t: "st", code: kp[1] ?? kp[2], n: c.ref };
       }
     }
   }
@@ -314,8 +363,17 @@ function codeOf(raw: string): string | undefined {
 
 /** Parse a comma-separated stitch sequence, including * repeats and [ ] groups. */
 function readSeq(src: Slice): Op[] {
-  const t = trim(src);
+  const raw = trim(src);
+  // A missing comma after an abbreviation in brackets, "ssk (ssk) knit to …": ") " becomes ")," (same length, same offsets).
+  const t = { s: raw.s.replace(/(\(\s*[a-z0-9]+\s*\)) (?=[a-z])/gi, "$1,"), at: raw.at };
   if (!t.s) return [];
+  // "Remove end-of-round marker, k1, replace marker for new end-of-round, …": the round now starts one stitch on.
+  // Those stitches finish the previous round, so they don't count against this one.
+  const shift = /^remove (?:the |unique )*(?:(?:end|beg(?:inning)?)[- ]of[- ](?:rnd|round) )?marker,\s*[kps]l?\s*\d+[^,]*,\s*(?:re)?place (?:the |unique |new )*marker(?: for (?:the )?new (?:end|beg(?:inning)?)[- ]of[- ](?:rnd|round))?\s*(?:,\s*|$)/i.exec(t.s);
+  if (shift) return [{ t: "note", text: "Move the start of the round" }, ...readSeq(slice(t, shift[0].length))];
+  // "K1, p1 rib" / "k2, p2 ribbing to end": that pair repeated across the row.
+  const rib = /^(.*?[^\s,])\s+rib(?:bing)?(?:\s+(?:to end|across|around))?$/i.exec(t.s);
+  if (rib && !t.s.includes("*")) return [{ t: "repEnd", body: readSeq(slice(t, 0, rib[1].length)), leave: zero() }];
   // * ... ; rep from * <spec> [, suffix]
   const star = topLevelIndex(t.s, "*");
   if (star >= 0) {
@@ -336,6 +394,18 @@ function readSeq(src: Slice): Op[] {
       const suffix = slice(t, suffixStart).s.replace(/^[\s,;]+/, "");
       const suffixSlice = { s: suffix, at: t.at + t.s.length - suffix.length };
       return [...readSeq(prefix), repeatOp(bodyOps, spec), ...readSeq(suffixSlice)];
+    }
+    // "*K2, p2* rep to end" / "*k1, p1*, repeat across": the second star closes the repeat.
+    const close = t.s.indexOf("*", star + 1);
+    if (close > star) {
+      const after = slice(t, close + 1);
+      const specText = after.s.replace(/^[\s,;]*(?:rep(?:eat)?(?:\s+from\s+\*(?:\s+to\s+\*)?)?)?\s*/i, "");
+      const parts = splitTop({ s: specText, at: after.at + after.s.length - specText.length });
+      const spec = parts[0] ? readRepeatSpec(parts[0]) : null;
+      if (spec) {
+        const rest = parts.slice(1).map((p) => readSeq(p)).flat();
+        return [...readSeq(slice(t, 0, star)), repeatOp(readSeq(slice(t, star + 1, close)), spec), ...rest];
+      }
     }
     // A lone star with no "rep from *" is a convention we don't support.
     throw new ReadError(`Found "*" without "rep from *"`);
@@ -379,9 +449,21 @@ function topLevelIndex(s: string, ch: string): number {
  * Pull a declared stitch count off the end of a row body:
  * "(72 sts)", "(72 (81, 90) sts)", "— 72 sts", "[72 sts rem]", ": 72 sts".
  */
-function readDeclared(body: Slice): { rest: Slice; declared?: SizedRef } {
+function readDeclared(body: Slice): { rest: Slice; declared?: SizedRef; change?: StitchChange } {
   const t = stripTrailing(trim(body));
   const s = t.s;
+  // "[6 stitch markers placed, …]" is a note, not a count.
+  const note = /\s*[[(][^\][()]*\bmarkers?\b[^\][()]*[\])]$/i.exec(s);
+  if (note) return readDeclared(slice(t, 0, note.index));
+  // "[6 stitches decreased]", "(8 sts dec'd)", "[2 sts inc'd]": how much the row changes the count.
+  const change = /[[(]\s*([\d\s(),/–—-]+?)\s*(?:sts?|stitches)\s+(dec(?:reased|'d|’d)?|inc(?:reased|'d|’d)?)\s*[\])]$/i.exec(s);
+  if (change) {
+    const numAt = change.index + change[0].indexOf(change[1]);
+    const num = readSized(slice(t, numAt));
+    if (num && num.length === change[1].trim().length) {
+      return { rest: stripTrailing(slice(t, 0, change.index)), change: { ref: num.ref, sign: /^dec/i.test(change[2]) ? -1 : 1 } };
+    }
+  }
   const unitRe = /\s*(sts?|stitches)(\s+(rem|remain|remaining|on needle|on needles|total|in total|left))?\s*$/i;
   // Bracketed at the very end.
   if (s.endsWith(")") || s.endsWith("]")) {
@@ -408,7 +490,7 @@ function readDeclared(body: Slice): { rest: Slice; declared?: SizedRef } {
     }
   }
   // Dash / colon / comma form: "— 72 sts", ": 72 (81, 90) sts".
-  const dash = /(?:\s[—–-]{1,2}\s*|:\s*|,\s*|\s=\s*)(\d[\d\s(),/]*?)\s*(sts?|stitches)(\s+(rem|remain|remaining|on needle|on needles|total|left))?\s*$/i.exec(s);
+  const dash = /(?:\s[—–-]{1,2}\s*|:\s*|,\s*|\s=\s*|\.\s+|;\s*)(\d[\d\s(),/]*?)\s*(sts?|stitches)(\s+(rem|remain|remaining|on needle|on needles|total|left))?\s*$/i.exec(s);
   if (dash) {
     const numStart = dash.index + dash[0].indexOf(dash[1]);
     const num = readSized(slice(t, numStart));
@@ -500,7 +582,8 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
       maxSizes = Math.max(maxSizes, row.only.length);
       const active = row.only.filter(Boolean).length;
       // "Adult S and Adult L sizes only: … (87 (95) sts)" gives one number per working size; spread them out.
-      if (row.only.length > 1 && active > 1 && active < row.only.length) {
+      // Only inside a "sizes only" section: a count at the end of a per-size repeat block holds for every size.
+      if (sectionOnly && row.only.length > 1 && active > 0 && active < row.only.length) {
         const spread = (ref: SizedRef): SizedRef => {
           if (ref.values.length !== active) return ref;
           let k = 0;
@@ -530,6 +613,8 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
     // A row only the larger sizes work doesn't move the first size's row numbers.
     if (row.only && !row.only[0] && row.only.length > 1) {
       if (row.number !== null && !row.copyOf) row.label = `Extra ${row.round ? "rnd" : "row"}`;
+      // Still findable by number, so "Rep rows 2–3" inside that section works.
+      if (row.number !== null && !row.copyOf) byNumber.set(row.number, row);
       rows.push(row);
       return;
     }
@@ -567,7 +652,8 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
       const number = startNumber + i;
       pushRow({
         key: nextKey(),
-        label: `${round ? "Rnd" : "Row"} ${number}`,
+        // Copies of rows only larger sizes work keep that label; their numbers follow the first size.
+        label: src.label.startsWith("Extra") ? src.label : `${round ? "Rnd" : "Row"} ${number}`,
         number,
         line,
         side: src.side,
@@ -591,11 +677,25 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
     skipFill = true;
   };
 
+  // Lines folded into the row above them (see below).
+  const joined = new Set<number>();
+  const startsRow = /^\s*(?:[•·▪◦‣–-]\s*)?(?:(?:set-?up|foundation|next|dec(?:rease)?|inc(?:rease)?)\s+)?(?:rows?\b|rnds?\b|rounds?\b|r\d|co\b|cast on\b|rep(?:eat)?\b)/i;
   for (let li = 0; li < lines.length; li++) {
-    const raw = lines[li];
+    let raw = lines[li];
     const lineAt = offset;
     offset += raw.length + 1;
-    const line = trim({ s: raw, at: lineAt });
+    if (joined.has(li)) { ignored++; continue; }
+    // A row broken over lines when copied from a PDF: the break becomes a space, so every character keeps its offset.
+    for (let n = li + 1; n < lines.length && startsRow.test(raw) && !/[.:;)\]]\s*$/.test(raw) && /^\s*[a-z0-9*[(]/.test(lines[n]) && !startsRow.test(lines[n]); n++) {
+      raw += " " + lines[n];
+      joined.add(n);
+    }
+    // Bullets in front of a row ("• Row 1: …") aren't part of it.
+    const bullet = /^\s*[•·▪◦‣]\s*/.exec(raw) ?? (/^\s*[–-]\s+(?=\S)/.exec(raw) && startsRow.test(raw) ? /^\s*[–-]\s+/.exec(raw) : null);
+    const lineRaw = bullet ? trim({ s: raw.slice(bullet[0].length), at: lineAt + bullet[0].length }) : trim({ s: raw, at: lineAt });
+    // "With Color B, repeat Round 1 …", "With MC, continue knitting …": the yarn named doesn't change the count.
+    const lead = /^with\b[^,]{0,40},\s*(?=(?:rep(?:eat)?|knit|purl|work|cont(?:inue)?|cast|co|loosely)\b)/i.exec(lineRaw.s);
+    const line = lead ? slice(lineRaw, lead[0].length) : lineRaw;
     const lower = line.s.toLowerCase();
     if (!line.s || /^(#|\/\/)/.test(line.s)) {
       ignored++;
@@ -606,9 +706,9 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
       if (titleM) { title = titleM[1].trim(); ignored++; continue; }
       const sizesM = /^sizes?\s*:\s*(.+)$/i.exec(line.s);
       if (sizesM) {
-        const names = sizesM[1]
-          .replace(/[()]/g, ",")
-          .split(/[,/]/)
+        // "S (M, L)", "S, M, L", "32 (36, 40)\" chest": text after the group (a unit) isn't another size.
+        const group = /^(.*?)\s*\(([^)]*)\)/.exec(sizesM[1]);
+        const names = (group ? [group[1], ...group[2].split(/[,/]/)] : sizesM[1].split(/[,/]/))
           .map((x) => x.trim())
           .filter(Boolean);
         if (names.length) sizeNames = names;
@@ -616,6 +716,13 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         continue;
       }
 
+      // A bare size line before the cast-on: "Baby (Kid, Adult Small, Adult Medium, Adult Large)".
+      const bareSizes = !sizeNames && rows.length === 0 && /^([A-Za-z][\w .'’/+-]*?)\s*\(([^()]*,[^()]*)\)\s*$/.exec(line.s);
+      if (bareSizes && !SECTION_HINT.test(lower) && !/\d\s*(?:"|”|in\b|cm\b|inches)/i.test(line.s)) {
+        sizeNames = [bareSizes[1], ...bareSizes[2].split(",")].map((x) => x.trim()).filter(Boolean);
+        ignored++;
+        continue;
+      }
       if (ALL_SIZES_RE.test(stripTrailing(line).s)) { sectionOnly = null; ignored++; continue; }
       const onlyM = SIZES_ONLY_RE.exec(stripTrailing(line).s);
       if (onlyM && !ROW_HEAD_RE.test(line.s) && sizeNames) {
@@ -635,7 +742,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
 
       // Cast-on line.
       // "CO 88 sts." / "With smaller needle, cast on 88 (96) sts."
-      const co = /^(?:(?:with|using)\b[^,.:;]{0,60},\s*)?(?:co|cast on)\s+/i.exec(line.s);
+      const co = /^(?:(?:with|using)\b[^,.:;]{0,60},\s*)?(?:loosely\s+|provisionally\s+)?(?:co|cast on|cast(?=\s+\d))\s+/i.exec(line.s);
       if (co) {
         const c = readSized(slice(line, co[0].length));
         if (!c) throw new ReadError("Couldn't read the cast-on count");
@@ -663,13 +770,44 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         });
         continue;
       }
-      if (/^(join|pm|place (a )?marker)\b/i.test(line.s) && !SECTION_HINT.test(lower.replace(/\b(join|marker|rnd|round)\b/g, ""))) {
+      // "Place unique stitch marker and join for working in the round, being careful not to twist the stitches."
+      const joinLine = /^(?:place|pm)\b[^.]*\bmarker\b[^.]*\bjoin\b|^join\b[^.]*\b(?:rnd|round)\b/i.test(line.s) && !/\d/.test(line.s);
+      if (joinLine || (/^(join|pm|place (a )?marker)\b/i.test(line.s) && !SECTION_HINT.test(lower.replace(/\b(join|marker|rnd|round)\b/g, "")))) {
         round = true;
         ignored++;
         continue;
       }
 
       // "Rep last 2 rows 3 more times." / "Rep rows 1–2 four more times."
+      // "Repeat Round 1 for 4 (6, 6, 6) more rounds", "repeat Rounds 1–2 for 12 rounds".
+      const forM = /^rep(?:eat)?\s+(?:rows?|rnds?|rounds?)\s+(\d+)(?:\s*(?:-|–|—|to|through|and)\s*(\d+))?\s+for\s+(.+?)\s+(?:more\s+)?(?:rows?|rnds?|rounds?)(?:\s+more)?$/i.exec(stripTrailing(line).s.replace(/\.\s.*$/, ""));
+      if (forM) {
+        const c = readCount({ s: forM[3], at: line.at + line.s.indexOf(forM[3], forM[0].indexOf("for")) });
+        if (!c || c.length !== forM[3].length) throw new ReadError("Couldn't read how many rows to work");
+        noteSizes(c.ref);
+        const counts = c.ref.values;
+        copyRows(num(forM[1]), forM[2] ? num(forM[2]) : num(forM[1]), lastNumber + 1, Math.max(...counts), li, line.s, undefined,
+          counts.length > 1 ? (i) => counts.map((n) => i < n) : undefined, c.ref);
+        continue;
+      }
+      // "Knit 7 rows even", "Purl 2 (3, 4) rounds".
+      const knitN = /^(knit|purl)\s+(.+?)\s+(?:rows?|rnds?|rounds?)(?:\s+even)?$/i.exec(stripTrailing(line).s);
+      const knitCount = knitN ? readCount({ s: knitN[2], at: line.at + knitN[1].length + 1 }) : null;
+      if (knitN && knitCount && knitCount.length === knitN[2].length) {
+        noteSizes(knitCount.ref);
+        const counts = knitCount.ref.values;
+        const total = Math.max(...counts);
+        for (let i = 0; i < total; i++) {
+          const number = lastNumber + 1;
+          pushRow({
+            key: nextKey(), label: `${round ? "Rnd" : "Row"} ${number}`, number, line: li, round, source: line.s,
+            ops: [{ t: "toEnd", code: /^k/i.test(knitN[1]) ? "k" : "p", leave: zero() }],
+            copyOf: i > 0 ? rows[rows.length - 1]?.key : undefined,
+            only: counts.length > 1 ? counts.map((n) => i < n) : undefined,
+          });
+        }
+        continue;
+      }
       const repLine = readDeclared(stripTrailing(line));
       const lastM = LAST_ROWS_RE.exec(stripTrailing(repLine.rest).s);
       const fromM = ROWS_FROM_RE.exec(stripTrailing(repLine.rest).s);
@@ -727,7 +865,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         continue;
       }
 
-      if (/^(work|continue|cont|knit|purl|rep(?:eat)?)\b.*\buntil\b/i.test(line.s) && !ROW_HEAD_RE.test(line.s)) {
+      if ((/^(work|continue|cont|knit|purl|rep(?:eat)?)\b.*\buntil\b/i.test(line.s) || /\b(?:knit|purl|work)(?:ing|ting)?\b.*\b(?:until|for)\b.*\b(?:measures?|inches|in|cm)\b/i.test(line.s) || /^rep(?:eat)?\b.*\bfor\b.*\b(?:inches|in|cm)\b/i.test(line.s)) && !ROW_HEAD_RE.test(line.s)) {
         pushUntil(li, line.s);
         continue;
       }
@@ -752,7 +890,11 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
 
       const head = ROW_HEAD_RE.exec(line.s);
       if (!head) {
-        if (SECTION_HINT.test(lower)) {
+        // Once the stitches are bound off, loose lines are finishing notes (weaving in, duplicate stitch).
+        const finished = rows.length > 0 && rows[rows.length - 1].ops.some((o) => o.t === "bo" && o.n === "all");
+        // "NOTE: change to double pointed needles…", "Fold the cast-on edge up…": guidance, not stitches.
+        const aside = /^(?:note|tip|hint|samples?)\b|^fold\b/i.test(line.s);
+        if (SECTION_HINT.test(lower) && !finished && !aside) {
           unread.push({ line: li, text: line.s, reason: "Not in a row-by-row form Stitchproof can read offline" });
         } else {
           ignored++;
@@ -809,8 +951,9 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
         continue;
       }
 
-      const { rest, declared } = readDeclared(bodyStripped);
+      const { rest, declared, change } = readDeclared(bodyStripped);
       noteSizes(declared);
+      noteSizes(change?.ref);
       let ops: Op[] = [];
       let rowUnverifiable = unverifiable;
       if (!rowUnverifiable) {
@@ -839,6 +982,7 @@ export function parsePattern(text: string, _opts: ParseOptions = {}): Program {
           round,
           ops,
           declared: i === count - 1 ? declared : undefined,
+          change: i === 0 ? change : undefined,
           unverifiable: rowUnverifiable,
           source: line.s,
           copyOf: i > 0 ? rows[rows.length - i]?.key : undefined,

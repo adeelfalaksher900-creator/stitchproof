@@ -30,6 +30,7 @@ Stitchproof checks the arithmetic for you — without trusting a language model 
 | **Suggested fixes** | For each erratum, Stitchproof tries small edits, re-counts the whole pattern for each, and proposes the one that makes everything agree, with its evidence. One click applies it. |
 | **Shape preview** | The piece's silhouette, row by row, for the selected size. |
 | **Plain English** | Any row expands into words, with the repeat counts worked out ("repeat [purl 2, knit 2] until 5 stitches remain — that's 9 times"). |
+| **Open PDF** | Open a pattern PDF (or a text file). It's read on your device and never uploaded. |
 | **Copy report** | A plain-text summary of every erratum (row, size, what's wrong, likely fix) with a link to the full proof, for a message to the seller, a marketplace report or test knitters. |
 | **Knit mode** | One row at a time, with the count to expect. Your place is saved in the browser. |
 | **Share links** | "Share proof" copies a link with the whole pattern compressed into the URL fragment, so a designer can send a proof to test knitters — nothing is uploaded or stored. |
@@ -59,7 +60,7 @@ flowchart LR
 
 **1. Read.** The offline reader (`lib/stitch/parse.ts`) turns standard notation — `CO 80 (88, 96) sts`, `*K2, p2; rep from * to last 3 sts, k3`, `Rows 3–12: Rep rows 1–2`, `(72 (81, 90) sts)` — into a *stitch program*. It records the character span of every number so fixes can edit the original text. Lines it can't read are reported, never guessed.
 
-**2. Translate (only if needed).** If any line can't be read, the text goes to `/api/read`, which asks a small model (Google `gemini-flash-lite-latest` with reasoning off, then `gemini-flash-latest`) to rewrite the pattern in strict notation. The model is told to copy every number exactly — even wrong ones — so mistakes survive to be found. The output is parsed by the same offline reader; if it fails, the model is asked once more with the parser's exact errors. Anything it can't express is marked `UNSURE` and shown as "not counted".
+**2. Translate (only if needed).** If any line can't be read, the text goes to `/api/read`, which asks a small model (Google `gemini-flash-lite-latest` with reasoning off, then `gemini-flash-latest`; OpenRouter's `google/gemini-2.5-flash-lite` and `openrouter/free` if Gemini fails) to rewrite the pattern in strict notation. The model is told to copy every number exactly — even wrong ones — so mistakes survive to be found. The output is parsed by the same offline reader; if it fails, the model is asked once more with the parser's exact errors. Anything it can't express is marked `UNSURE` and shown as "not counted".
 
 **3. Count.** Every stitch is defined by how many stitches it **uses** and how many it **makes** (`k2tog` uses 2, makes 1; `yo` uses 0, makes 1). The counter (`lib/stitch/simulate.ts`) walks each row for each size, solves "to end" repeats as `(available − used − leave) ÷ stitches per repeat`, and flags rows where a repeat doesn't fit, stitches run out or are left unworked, or the result disagrees with the stated count.
 
@@ -78,7 +79,7 @@ flowchart TB
   end
   subgraph Vercel
     API[/api/read<br/>Zod validation · rate limit · timeout/]
-    GW[Google Gemini<br/>server key, or the visitor's own key]
+    GW[Google Gemini, then OpenRouter<br/>server keys, or the visitor's own Gemini key]
   end
   UI -- only unreadable patterns --> API --> GW
   API -- strict notation --> UI
@@ -86,11 +87,11 @@ flowchart TB
 
 - **No accounts, no database.** Patterns and your place in them stay in your browser.
 - **Privacy:** standard patterns never leave the browser. *Offline* mode guarantees no network call for reading.
-- **Security:** request size limit (20,000 chars), Zod validation, per-instance rate limit, 25 s per model call and 52 s per request, security headers and a same-origin Content-Security-Policy, no secrets in the client. The site's Gemini key is a Vercel sensitive environment variable; a visitor's own key stays in their browser and is used for one request at a time, never stored or logged.
+- **Security:** request size limit (20,000 chars), Zod validation, a same-origin check (other sites can't use the AI reader), a Vercel Firewall rate limit (10 requests a minute per IP) plus a per-instance one, 25 s per model call and 52 s per request, security headers and a same-origin Content-Security-Policy, no secrets in the client. The site's Gemini and OpenRouter keys are Vercel sensitive environment variables; a visitor's own key stays in their browser and is used for one request at a time, never stored or logged.
 
 ## Tech stack
 
-Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · AI SDK 7 + Vercel AI Gateway · Zod 4 · Vitest · Playwright · Inter, Instrument Serif and JetBrains Mono (self-hosted via Fontsource).
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · AI SDK 7 with Google Gemini and OpenRouter (Vercel AI Gateway optional) · pdf.js · Zod 4 · Vitest · Playwright · Inter, Instrument Serif and JetBrains Mono (self-hosted via Fontsource).
 
 ## Project structure
 
@@ -103,11 +104,13 @@ app/
   api/read/route.ts     AI reader (server)
 components/             UI (ProofWorkspace, RowList, ShapePreview, StitchStrip, KnitView, CountingMachine…)
 lib/
-  stitch/               types, stitches, parse, simulate, fixes, errata, explain, proof
+  stitch/               types, stitches, parse, simulate, fixes, errata (+ Web Worker), explain, proof, evaluate
   ai/                   prompt + reader (validation and repair loop)
+  pdf.ts                PDF text, read in the browser (pdf.js)
+  report.ts             the plain-text proof report
   samples.ts            original sample patterns
   store.ts              localStorage persistence
-tests/unit/             Vitest: reader, counter, fixer, AI-reader loop
+tests/unit/             Vitest: reader, counter, markers, fixer, AI-reader loop, API route, report, share links
 tests/e2e/              Playwright: the core journey on desktop and mobile
 devpost/                scope.md, prd.md, spec.md, checklist.md, app-map.html
 .agents/skills/         the Devpost Learn Skill Pack used to plan and build this
@@ -143,6 +146,27 @@ Measured, not claimed. Every number in six correct patterns (cast-ons, repeat co
 
 The other 27 typos change no stitch count (e.g. how many plain rows to knit), so no count-based check can see them. The harness is [`lib/stitch/evaluate.ts`](lib/stitch/evaluate.ts); run it with `npx tsx scripts/eval-fixer.ts`. The home page recomputes these numbers on every build, and a unit test fails if detection or repair drops below 100%.
 
+## Tested on real published patterns
+
+Planted typos only go so far, so we also pasted eight free hat patterns from [Purl Soho](https://www.purlsoho.com/create/) exactly as published: 38 sizes in all, with stitch markers, sizes-only sections and repeat counts that differ by size. Every line was read offline, with no AI. (The pattern text isn't in this repository; it belongs to Purl Soho.)
+
+| Pattern | Sizes | Result |
+|---|---|---|
+| [Classic Ribbed Hat](https://www.purlsoho.com/create/2019/01/30/classic-ribbed-hat/) | 5 | adds up |
+| [Giving Hat](https://www.purlsoho.com/create/2025/12/06/giving-hat/) | 5 | adds up |
+| [Simply Hemmed Hat](https://www.purlsoho.com/create/2025/01/15/simply-hemmed-hat/) | 5 | adds up |
+| [If You Knit, You Know Hat](https://www.purlsoho.com/create/2025/11/10/if-you-knit-you-know-hat/) | 5 | adds up; the decrease round stops before the end-of-round marker, which gets a note ("Stitchproof assumes you knit them; the pattern doesn't say") |
+| [Rolled Rib Hat](https://www.purlsoho.com/create/2024/02/22/rolled-rib-hat/) | 5 | adds up |
+| [Duet Hat](https://www.purlsoho.com/create/2026/10/12/duet-hat/) | 4 | adds up |
+| [Happy Hat](https://www.purlsoho.com/create/2021/12/01/happy-hat/) | 4 | adds up |
+| [Box Hat](https://www.purlsoho.com/create/2025/01/25/box-hat/) | 5 | **1 count that can't work** |
+
+**The Box Hat finding.** The crown says "Repeat last two rounds 4 (6, 8, 9, 12) more times. [36 stitches remain]". In the largest size, 84 stitches less 4 per decrease round reaches 36 after 12 decrease rounds, so the repeat should be 11 more times. Twelve more asks for a 13th decrease round, and Stitchproof flags it: "k to 2 before the marker" needs 2 stitches before the marker, but only 1 is left there. Its suggested fix is "Change 12 to 11 in the repeat count (size Adult Medium/Large only)", and with it every size adds up. We checked the arithmetic by hand. A reader asked about this step in the pattern's comments in February 2025; the reply repeated the 12, and the published text still says 12.
+
+Rows worked to a length ("until piece measures 6 in") are marked *can't verify* in every pattern; that's expected, not a failure.
+
+We also tried a pattern a chatbot wrote (a houndstooth scarf a knitting blog published in 2023 to test ChatGPT). Its counts add up. Whether its stitches make the fabric it promises is something counting can't judge: Stitchproof checks that a pattern can be knit as written, not that it looks right.
+
 ## Tests
 
 ```bash
@@ -171,14 +195,17 @@ Import the repository into Vercel (framework: Next.js) and add `GOOGLE_GENERATIV
 | `Rep last 2 rnds 3 (4, 5) more times.` / `– (1, 2) more times` / `Rnds 13–40 (13–46, 13–52):` | row counts that differ by size |
 | `Rep last 2 rnds until 16 (20) sts rem.` | repeats until a count — checked to land exactly on it |
 | `Adult S and Adult L sizes only:` … `All sizes:` | sections only some sizes work |
-| `Dec rnd:` / `Inc row:` / `With smaller needle, CO 88 sts.` | common published phrasing |
+| `Dec rnd:` / `Inc row:` / `Set-Up Round:` / `With smaller needle, CO 88 sts.` / `knit 2 together (k2tog)` | common published phrasing |
+| `[k2tog, sm] 6 times. [6 stitches decreased]` | stated increases and decreases, checked too |
+| `Remove end-of-round marker, k1, replace marker` | moving the start of the round |
+| `Knit 7 rounds.` / `Repeat Round 1 for 4 (6) more rounds.` | plain rows and repeats in words |
 | `(72 (81, 90) sts)` / `— 72 sts` | stated counts |
 | `w&t`, `work even until 6 in`, `rep rnd 1 until piece measures 2 in` | marked *can't verify* (never guessed) |
 
 ## Limitations
 
 - Knitting only (crochet's turning-chain conventions need their own rules).
-- Text only — no charts, photos or PDFs.
+- Written instructions only: no charts or photos. PDFs are read for their text on your device; a scanned PDF (pictures of pages) has no text to read.
 - Rows worked to a length ("until piece measures 6 in") and short rows can't be settled by counting; they're marked *can't verify* and the count is carried forward.
 - Not yet tested by knitters outside the team. If you try it on a real pattern, please [open an issue](https://github.com/adeelfalaksher900-creator/stitchproof/issues) with what it got wrong.
 - The rate limit is per server instance (best effort).

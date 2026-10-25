@@ -29,7 +29,7 @@
 <body>
 <main>
   <h1>Stitchproof — app map</h1>
-  <p class="muted">A snapshot of how the finished proof of concept fits together (source as of the commit that adds this file). It can drift as the code changes.</p>
+  <p class="muted">A snapshot of how the finished proof of concept fits together (refreshed October 25, 2026, after the real-pattern round). It can drift as the code changes.</p>
 
   <h2>What it is</h2>
   <p>Paste a knitting pattern. The <strong>reader</strong> turns it into a stitch program, the <strong>counter</strong> runs every row for every size, and the <strong>fixer</strong> searches for the smallest edit that makes a broken row add up. AI is used only to translate lines the offline reader can't parse, and its output is parsed again before anything is counted.</p>
@@ -52,7 +52,7 @@
   <ol class="route">
     <li><code>components/ProofWorkspace.tsx</code> → <code>run()</code>: validates length, calls <code>readPattern</code>, then <code>proofProgram</code>, saves the pattern with <code>save()</code>.</li>
     <li><code>lib/read.ts</code> → <code>readPattern()</code>: tries <code>parsePattern()</code> (in <code>lib/stitch/parse.ts</code>); only if lines are <em>unread</em> does it POST to <code>app/api/read/route.ts</code>, whose <code>aiRead()</code> (<code>lib/ai/reader.ts</code>) parses the model's notation and retries once with the parser's errors.</li>
-    <li><code>lib/stitch/simulate.ts</code> → <code>simulateRow()</code>: walks the ops with the <code>STITCHES</code> uses/makes table (<code>lib/stitch/stitches.ts</code>) and produces each row's status and messages. <code>lib/stitch/errata.ts</code> → <code>findErrata()</code> then calls <code>findFixes()</code> (<code>lib/stitch/fixes.ts</code>) to rank edits.</li>
+    <li><code>lib/stitch/simulate.ts</code> → <code>simulateRow()</code>: walks the ops with the <code>STITCHES</code> uses/makes table (<code>lib/stitch/stitches.ts</code>) and produces each row's status and messages; its <code>Walk</code> carries stitch-marker positions from row to row. <code>lib/stitch/errata.ts</code> → <code>findErrata()</code> then calls <code>findFixes()</code> (<code>lib/stitch/fixes.ts</code>) to rank edits; the page runs it in a Web Worker (<code>lib/stitch/errata.worker.ts</code>) so long patterns don't freeze the tab.</li>
   </ol>
 
   <h2>To change this, start here</h2>
@@ -60,7 +60,8 @@
     <li><strong>Add a stitch</strong> (e.g. <code>m1lp</code>): add it to <code>STITCHES</code> or <code>ALIASES</code> in <code>lib/stitch/stitches.ts</code>; the counter, strip and plain English pick it up.</li>
     <li><strong>Read a new phrasing offline</strong>: <code>readItem()</code> or <code>readRepeatSpec()</code> in <code>lib/stitch/parse.ts</code>, plus a test in <code>tests/unit/stitch.test.ts</code>.</li>
     <li><strong>Change how fixes are ranked</strong>: the <code>delta</code> score and sort at the end of <code>findFixes()</code>.</li>
-    <li><strong>Change the AI model or prompt</strong>: <code>candidates()</code> in <code>app/api/read/route.ts</code> and <code>SYSTEM_PROMPT</code> in <code>lib/ai/prompt.ts</code>.</li>
+    <li><strong>Change the AI model or prompt</strong>: <code>candidates()</code> in <code>app/api/read/route.ts</code> (Gemini first, then OpenRouter) and <code>SYSTEM_PROMPT</code> in <code>lib/ai/prompt.ts</code>.</li>
+    <li><strong>Read files</strong>: <code>openFile()</code> in <code>components/ProofWorkspace.tsx</code>; PDFs go through <code>pdfText()</code> in <code>lib/pdf.ts</code>, in the browser.</li>
     <li><strong>Add a sample</strong>: <code>lib/samples.ts</code>.</li>
   </ul>
 

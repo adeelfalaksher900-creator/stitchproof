@@ -62,10 +62,20 @@ test.describe("core journey", () => {
 
   test("when the AI reader fails, the page falls back clearly", async ({ page }) => {
     await page.route("**/api/read", (r) => r.fulfill({ status: 503, json: { error: "The AI reader is unavailable right now." } }));
-    await page.goto("/proof?sample=scarf&run=1");
+    await page.goto("/proof");
+    await page.getByRole("textbox", { name: "Knitting pattern" }).fill("Cast on 31 stitches.\nKnit every row for six rows, then bind off.");
+    await page.getByRole("button", { name: /Proof pattern/ }).click();
     await expect(page.getByText(/Showing what the offline reader could read/)).toBeVisible();
     await expect(page.getByText("Not verified")).toBeVisible();
     await expect(page.getByRole("heading", { name: /nothing was checked yet/ })).toBeVisible();
+  });
+
+  test("the prose sample still works when the AI is down, and says it's a saved reading", async ({ page }) => {
+    await page.route("**/api/read", (r) => r.fulfill({ status: 503, json: { error: "The AI reader is unavailable right now." } }));
+    await page.goto("/proof?sample=scarf&run=1");
+    await expect(page.getByRole("heading", { name: /1 erratum/ })).toBeVisible();
+    await expect(page.getByText(/shows a reading the same model made earlier/)).toBeVisible();
+    await expect(page.getByText(/saved AI reading/)).toBeVisible();
   });
 });
 
@@ -143,4 +153,22 @@ Rep last 2 rnds 2 (2, 3) more times. (56 sts)`;
   for (let i = 0; i < 7; i++) await page.getByRole("button", { name: /Next row/ }).click();
   await expect(page.locator("article").getByText("Rnd 7", { exact: true })).toBeVisible();
   await expect(page.locator("article").getByText(/knit 10, place a marker\] to the end — that.s 8 times/)).toBeVisible();
+});
+
+test("a pattern PDF is read in the browser, wrapped rows and all", async ({ page, browser }) => {
+  const maker = await browser.newPage();
+  await maker.setContent(`<pre style="font: 14px monospace; width: 300px; white-space: pre-wrap">Title: PDF Hat
+CO 80 sts. Join to work in the rnd.
+Rnd 1: *K2, p2; rep from *
+around.
+Rnd 2: *K8, k2tog; rep from * to end. (72 sts)</pre>`);
+  const pdf = await maker.pdf({ format: "A6" });
+  await maker.close();
+  await page.goto("/proof");
+  await page.getByRole("button", { name: /Offline/ }).click();
+  await page.locator('input[type="file"]').setInputFiles({ name: "hat.pdf", mimeType: "application/pdf", buffer: pdf });
+  await expect(page.getByText(/Read hat\.pdf \(1 page\) in your browser; nothing was uploaded/)).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Knitting pattern" })).toHaveValue(/Rnd 2: \*K8, k2tog/);
+  await page.getByRole("button", { name: /Proof pattern/ }).click();
+  await expect(page.getByText("Proven", { exact: true })).toBeVisible();
 });

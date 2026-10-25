@@ -2,7 +2,7 @@
 
 import { forwardRef, useImperativeHandle, useRef } from "react";
 
-export type LineMark = "issue" | "unread" | "ok" | "fixed";
+export type LineMark = "issue" | "unread" | "warn" | "ok" | "fixed";
 
 interface Props {
   value: string;
@@ -20,6 +20,7 @@ export interface EditorHandle {
 const MARK_COLOR: Record<LineMark, string> = {
   issue: "var(--bad)",
   unread: "var(--warn)",
+  warn: "var(--warn)",
   ok: "var(--ok)",
   fixed: "var(--accent)",
 };

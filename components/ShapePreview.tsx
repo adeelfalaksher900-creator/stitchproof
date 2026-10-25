@@ -54,7 +54,7 @@ export function ShapePreview({ program, result, selectedKey, onSelect, height = 
           const w = Math.max(2, ((W - pad * 2) * count) / max);
           const y = H - pad - (idx + 1) * step + (step - barH) / 2;
           const color =
-            r.status === "issue" ? "var(--bad)" : r.status === "unverifiable" ? "var(--warn)" : "var(--ink)";
+            r.status === "issue" ? "var(--bad)" : r.status === "unverifiable" || r.status === "warn" ? "var(--warn)" : "var(--ink)";
           const isActive = idx === active;
           return (
             <rect

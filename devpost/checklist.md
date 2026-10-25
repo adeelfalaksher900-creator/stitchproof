@@ -75,9 +75,13 @@ Build mode: fast (learner asked for autonomous execution; hands-on review happen
 - [ ] Early usable behavior explored — shared with final review (learner asked to review the finished project once; pending)
 - [ ] Final kick-the-tires exploration and feedback completed
 
+Status: the learner directed three judge-style audit rounds of the live app and all their findings are resolved (see Revisions). Their own hands-on run of the live site is still to do, so both boxes stay open until they've tried it.
+
 ## Final Review
 
 - [ ] Final review complete — feedback resolved and learner confirms ready to ship
+
+Status: waiting for the learner to confirm.
 
 ## Code Tour and App Map
 
@@ -100,3 +104,6 @@ Activity mode: Recap.
 - The sandbox couldn't push to GitHub, so code reaches the repository through GitHub's web uploader; the first upload consolidated the local history into one commit, and later changes are committed one change at a time.
 - Judge-style audit round 1 found three gaps, now built: a fixer evaluation on deliberately broken patterns (published on the home page and in the README), private share links (pattern in the URL fragment, nothing stored), and a "What can I paste?" notation guide. The reader also learned "Row 2 and all WS rows", "to last st", "until" lines and more stitch spellings.
 - Audit round 2: the parser now refuses absurd numbers and caps patterns at 5,000 rows (a pasted "Rows 1–999999999" used to crash the tab); the fix search runs in a Web Worker so long patterns no longer freeze the page; share links stop decompressing past the size limit; production pages send a Content-Security-Policy; the unused `motion` package is gone. The design dropped AI-template defaults: indigo accent, uppercase section labels, an italic accent word, an unsourced stat strip and icon cards.
+- Audit round 3 (real patterns): eight free Purl Soho hat patterns (38 sizes) were run exactly as published. The counter now carries stitch-marker positions row to row, reads repeat counts that differ by size and sizes-only sections, and learned their phrasing (set-up rounds, glossed stitches, moving the end-of-round marker, stated decreases, "Knit 7 rounds", wrapped lines). Seven patterns add up; the Box Hat's largest size repeats its decrease one time too many, which Stitchproof flags and fixes (checked by hand; see README).
+- AI reader: OpenRouter is the fallback when Gemini fails; the route answers only Stitchproof's own pages; a Vercel Firewall rule limits it to 10 requests a minute per IP; a visitor's own key is kept for the session unless they tick "Remember". The prose sample shows a labelled earlier reading when no AI answers.
+- Added: open a pattern PDF (read in the browser with pdf.js), copy or download the proof report, a 404 page and an error page, a "Report a misread" link, and "can't verify" notes for rows that stop short of the end-of-round marker.

@@ -17,6 +17,14 @@ interface Walk {
   nextIn: number;
   /** Marker positions on the right needle. */
   outMarkers: number[];
+  /** True once the row has any marker to work towards (carried in or placed). */
+  hasMarkers: boolean;
+  /** Worked in the round: the end of the round is itself a marker. */
+  round: boolean;
+  /** Remarks that don't make the row wrong (status "warn"). */
+  notes: IssueMessage[];
+  /** Set when a marker can't be reached: where the knitter is is unknown, so the rest isn't counted. */
+  stuck: boolean;
 }
 
 /** Move every marker the working yarn has reached onto the right needle. */
@@ -86,12 +94,13 @@ function pushMarks(w: Walk, mark: StripMark, count: number) {
 
 function walk(ops: Op[], size: number, before: number, w: Walk) {
   for (const op of ops) {
+    if (w.stuck) return;
     passMarkers(w);
     switch (op.t) {
       case "note":
         break;
       case "marker":
-        if (op.kind === "pm") w.outMarkers.push(w.made);
+        if (op.kind === "pm") { w.outMarkers.push(w.made); w.hasMarkers = true; }
         else if (op.kind === "rm") {
           // The marker just passed (or the one right here) comes off.
           const i = w.outMarkers.lastIndexOf(w.made);
@@ -102,13 +111,20 @@ function walk(ops: Op[], size: number, before: number, w: Walk) {
       case "toMarker": {
         const d = stitchDef(op.code)!;
         const leave = at(op.leave, size);
+        if (!w.hasMarkers && !w.round) {
+          w.messages.push({ kind: "not-enough", text: "This row works to a marker, but no marker has been placed." });
+          w.solved.push(0);
+          w.stuck = true;
+          break;
+        }
         const remaining = toNextMarker(w, before) - leave;
         if (remaining < 0) {
           w.messages.push({
             kind: "not-enough",
-            text: `"${op.code} to ${leave ? `${leave} before ` : ""}the marker" needs ${leave - remaining} more stitch${leave - remaining === 1 ? "" : "es"} before the marker than there are.`,
+            text: `"${op.code} to ${leave ? `${leave} before ` : ""}the marker" needs ${leave} stitch${leave === 1 ? "" : "es"} before the marker, but only ${leave + remaining} ${leave + remaining === 1 ? "is" : "are"} left there.`,
           });
           w.solved.push(0);
+          w.stuck = true;
           break;
         }
         const n = Math.floor(remaining / d.uses);
@@ -120,15 +136,23 @@ function walk(ops: Op[], size: number, before: number, w: Walk) {
       case "repMarker": {
         const cost = fixedCost(op.body, size);
         const leave = at(op.leave, size);
+        if (!w.hasMarkers && !w.round) {
+          w.messages.push({ kind: "not-enough", text: "This row works to a marker, but no marker has been placed." });
+          w.solved.push(0);
+          w.stuck = true;
+          break;
+        }
         if (!cost || cost.uses === 0) {
           w.messages.push({ kind: "repeat-uneven", text: "This repeat doesn't use any stitches, so it can't run to the marker." });
           w.solved.push(0);
+          w.stuck = true;
           break;
         }
         const remaining = toNextMarker(w, before) - leave;
         if (remaining < 0) {
           w.messages.push({ kind: "not-enough", text: `The repeat needs ${-remaining} more stitch${remaining === -1 ? "" : "es"} before the marker than there are.` });
           w.solved.push(0);
+          w.stuck = true;
           break;
         }
         const times = Math.floor(remaining / cost.uses);
@@ -265,6 +289,7 @@ export function simulateRow(row: Row, size: number, before: number, markers: num
   const w: Walk = {
     used: 0, made: 0, solved: [], strip: [], messages: [], leftoverReported: 0,
     inMarkers: [...markers].sort((a, b) => a - b), nextIn: 0, outMarkers: [],
+    hasMarkers: markers.length > 0, round: row.round, notes: [], stuck: false,
   };
   const startsWithCo = row.ops[0]?.t === "co";
   if (before === 0 && !startsWithCo && row.ops.some((o) => o.t !== "note")) {
@@ -280,7 +305,15 @@ export function simulateRow(row: Row, size: number, before: number, markers: num
     const unworked = before - w.used;
     after += unworked;
     const extra = unworked - w.leftoverReported;
-    if (extra > 0) {
+    // A round worked marker to marker that stops short of the end-of-round marker: the stitches left are
+    // knitted to reach it. That's a gap in the wording, not in the count, so it's a note rather than an issue.
+    const toMarkers = (ops: Op[]): boolean => ops.some((o) => o.t === "toMarker" || o.t === "repMarker" || (o.t === "marker" && o.kind === "sm") || ((o.t === "rep" || o.t === "repEnd") && toMarkers(o.body)));
+    if (extra > 0 && row.round && toMarkers(row.ops) && w.messages.length === 0) {
+      w.notes.push({
+        kind: "unworked",
+        text: `The round stops ${extra} stitch${extra === 1 ? "" : "es"} before the end-of-round marker. Stitchproof assumes you knit ${extra === 1 ? "it" : "them"}; the pattern doesn't say.`,
+      });
+    } else if (extra > 0 && !w.stuck) {
       w.messages.push({
         kind: "unworked",
         text: `The row ends with ${extra} stitch${extra === 1 ? "" : "es"} still unworked (it uses ${w.used} of ${before}).`,
@@ -302,6 +335,16 @@ export function simulateRow(row: Row, size: number, before: number, markers: num
     .map((p) => Math.min(Math.max(0, p), finalAfter))
     .map((p) => (row.round ? p : finalAfter - p))
     .sort((a, b) => a - b);
+  if (row.change) {
+    const said = row.change.sign * at(row.change.ref, size);
+    if (!Number.isNaN(said) && after - before !== said) {
+      const word = (n: number) => `${n < 0 ? "decreases" : "increases"} by ${Math.abs(n)}`;
+      w.messages.push({
+        kind: "declared-mismatch",
+        text: after === before ? `This row keeps the count at ${after}; the pattern says it ${word(said)}.` : `This row ${word(after - before)}; the pattern says it ${word(said)}.`,
+      });
+    }
+  }
   if (declared !== undefined && declared !== after) {
     w.messages.unshift({
       kind: "declared-mismatch",
@@ -315,8 +358,8 @@ export function simulateRow(row: Row, size: number, before: number, markers: num
     makes: w.made,
     after,
     declared,
-    status: w.messages.length ? "issue" : "ok",
-    messages: w.messages,
+    status: w.messages.length ? "issue" : w.notes.length ? "warn" : "ok",
+    messages: w.messages.length ? w.messages : w.notes,
     solved: w.solved,
     strip: w.strip,
     markers: nextMarkers,
@@ -337,7 +380,7 @@ function simulateUntil(
     for (const r of until.cycle) {
       const prev = count;
       // A count printed on the first working of these rows doesn't hold for later repeats.
-      const res = simulateRow({ ...r, declared: undefined }, size, count, marks);
+      const res = simulateRow({ ...r, declared: undefined, change: undefined }, size, count, marks);
       if (res.status === "issue") {
         messages.push({ kind: res.messages[0]?.kind ?? "not-enough", text: `On repeat ${times + 1}, ${r.label}: ${res.messages[0]?.text ?? "it doesn't add up."}` });
         count = res.after;

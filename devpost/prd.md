@@ -110,6 +110,10 @@ Home, Proof, Knit mode, My patterns; offline reader; AI reader route with valida
 - Photo/PDF import — OCR is a separate failure mode.
 - Shareable reports — needs storage and a copyright policy for paid patterns.
 
+Revisions during the build (made at the learner's request after the judge-style audits):
+- Text-based PDFs are now read in the browser (no upload, no OCR); photos and scanned PDFs are still deferred.
+- Shareable proofs shipped without storage: the pattern is compressed into the link's fragment, so nothing is uploaded or kept, and the copyright question doesn't arise. A plain-text report can be copied or downloaded (a first step toward the tech-edit report below).
+
 ## Possible Later Enhancements
 Gauge and yardage checks per size; chart (grid) support; a designer "tech-edit report" export; Ravelry integration.
 

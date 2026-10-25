@@ -15,6 +15,9 @@ const EXAMPLES: [string, string][] = [
   ["Rows 7–40: Rep rows 5–6.", "Repeating earlier rows"],
   ["Rep last 2 rnds 3 (4, 5) more times.", "Repeats that differ by size, also “– (1, 2)” and “until 16 sts rem”"],
   ["Large and XL sizes only:   All sizes:", "Sections only some sizes work"],
+  ["[k2tog, sm] 6 times. [6 stitches decreased]", "Stated changes are checked too"],
+  ["Remove end-of-round marker, k1, replace marker", "Moving the start of the round"],
+  ["Knit 7 rounds.   Repeat Round 1 for 4 (6) more rounds.", "Plain rows and repeats in words"],
   ["(72 (81, 90) sts)   — 72 sts", "Stated stitch counts"],
   ["Sizes: S (M, L)", "Size names"],
 ];
@@ -47,8 +50,9 @@ export function NotationGuide({ label = "What can I paste?" }: { label?: string 
                 What Stitchproof reads
               </h2>
               <p className="mt-1 text-[14px] text-ink-2">
-                Standard written US knitting notation is read instantly in your browser. Anything else, like loose prose or unusual phrasing, goes to the AI
-                reader in Auto mode, and lines it can&apos;t express are marked “not counted”, never guessed.
+                Standard written US knitting notation, including the way most published patterns phrase it, is read instantly in your browser. You can also
+                open a PDF; it&apos;s read on your device. Anything else, like loose prose, goes to the AI reader in Auto mode, and lines it can&apos;t express are
+                marked “not counted”, never guessed.
               </p>
             </div>
             <form method="dialog" className="ml-auto">

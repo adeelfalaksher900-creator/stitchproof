@@ -39,6 +39,12 @@ export type Op =
 
 export type Side = "RS" | "WS";
 
+export interface StitchChange {
+  ref: SizedRef;
+  /** -1 for "decreased", 1 for "increased". */
+  sign: 1 | -1;
+}
+
 export interface Row {
   /** Stable key, e.g. "r12". Expanded row repeats get their own key. */
   key: string;
@@ -62,6 +68,8 @@ export interface Row {
   only?: boolean[];
   /** "Rep last 2 rnds until 16 sts rem": these rows, repeated until the count is reached. */
   until?: { count: SizedRef; cycle: Row[] };
+  /** "[6 stitches decreased]": how much the pattern says this row changes the count. */
+  change?: StitchChange;
   /** For copies made by "Rep last 2 rows 3 (4, 5) more times": that repeat count, so the fixer can edit it. */
   repeatRef?: SizedRef;
 }

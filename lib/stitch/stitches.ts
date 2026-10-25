@@ -43,6 +43,8 @@ export const STITCHES: Record<string, StitchDef> = {
   kfbf: { uses: 1, makes: 3, name: "knit front, back and front (double increase)", mark: "inc" },
   lli: { uses: 0, makes: 1, name: "left lifted increase", mark: "inc" },
   rli: { uses: 0, makes: 1, name: "right lifted increase", mark: "inc" },
+  // "Work in established pattern": each stitch worked as it presents itself, so the count holds.
+  patt: { uses: 1, makes: 1, name: "work in pattern", mark: "k" },
   // Passing a slipped stitch over takes one stitch off the right needle.
   psso: { uses: 0, makes: -1, name: "pass the slipped stitch over", mark: "decL" },
 };
@@ -81,6 +83,14 @@ export const ALIASES: Record<string, string> = {
   "sl1wyib": "sl-wyib",
   "m1pl": "m1p",
   "m1pr": "m1p",
+  "slipslipknit": "ssk",
+  "slipslippurl": "ssp",
+  "kf&b": "kfb",
+  "k1f&b": "kfb",
+  "k1fb": "kfb",
+  "pf&b": "pfb",
+  "p1f&b": "pfb",
+  "p1fb": "pfb",
 };
 
 /** Stitch codes ordered longest first, so "k2tog" wins over "k". */

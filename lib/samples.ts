@@ -3,6 +3,11 @@ export interface Sample {
   name: string;
   blurb: string;
   text: string;
+  /**
+   * A reading the live AI reader really produced for this sample, kept so the demo still works
+   * when the AI is unavailable (shown as a saved reading, never as a live one).
+   */
+  savedReading?: { canonical: string; model: string };
 }
 
 /**
@@ -72,5 +77,16 @@ Knit every row for the first six rows to make a garter border.
 Next comes one increase row: knit 3, make one, knit until 3 stitches are left, make one, then knit 3 — you'll have 34 stitches now.
 For the body, work this on every row: knit 3, then purl 1 and knit 1 alternately until 4 stitches remain, purl 1, and knit the last 3. Keep going until the body is 100 rows long.
 Finish with six more rows of plain knitting, then bind off loosely.`,
+    // Captured from the live /api/read on stitchproof-alpha.vercel.app (Oct 2026), unedited.
+    savedReading: {
+      model: "google/gemini-flash-lite-latest",
+      canonical: `Title: Weekend Seed-Stitch Scarf
+CO 31 sts.
+Rows 1–6: Knit.
+Row 7: K3, m1, k to last 3 sts, m1, k3. (34 sts)
+Rows 8–107: K3, *p1, k1; rep from * to last 4 sts, p1, k3.
+Rows 108–113: Knit.
+BO all sts.`,
+    },
   },
 ];
